@@ -64,15 +64,7 @@ details ol{margin:6px 0 6px 18px;padding:0}
 
 <script>
 // ---- Config -------------------------------------------------------------
-// Where finished applications go. Either:
-//  - a Discord webhook URL (https://discord.com/api/webhooks/...): each application arrives in that
-//    channel as an attached application.json, ready to load into the reviewer, or
-//  - any URL that accepts a JSON POST.
-// Left empty, applicants get a Download button and send you the file themselves.
-// Anyone can read this URL from the page source, so use a private channel and rotate it if abused.
 const SUBMIT_URL = "https://janitor-intake.jelloponies.workers.dev";
-// Optional answer key for the reviewer (open this file with #review on the end), one entry per post,
-// e.g. ["delete","approve",...]. Leave empty to skip automatic checking.
 const ANSWER_KEY = [];
 const GUIDE = "https://e6ai.net/help/uploading_guidelines";
 const POSTS = [
@@ -87,10 +79,8 @@ const POSTS = [
   {u:"https://cdn.imgchest.com/files/6a668bd44047.png"},
   {u:"https://cdn.imgchest.com/files/6618b6b048f9.jpg"}
 ];
-// Media loads from posts/post-N.<ext> next to this page first (e.g. posts/post-1.jpg, posts/post-2.mp4),
-// then falls back to the original link.
 const extOf=u=>u.split("?")[0].split(".").pop().toLowerCase();
-const mAttr=(n,u)=>`data-a="posts/post-${n}.${extOf(u)}" data-b="${u.replace(/"/g,"&quot;")}" data-v="${/^(mp4\vert{}webm)$/.test(extOf(u))?1:0}"`;
+const mAttr=(n,u)=>`data-a="posts/post-${n}.${extOf(u)}" data-b="${u.replace(/"/g,"&quot;")}" data-v="${/^(mp4|webm)$/.test(extOf(u))?1:0}"`;
 function mount(el){
   const urls=[el.dataset.a,el.dataset.b],vid=el.dataset.v==="1";let k=0;
   const n=document.createElement(vid?"video":"img");
@@ -141,7 +131,8 @@ function saveIntro(){readIntro();const e=introErr();if(e){$("#err").textContent=
 
 function postView(i){
   const p=POSTS[i],a=S.posts[i];
-  return `<h2>Post ${i+1} of ${POSTS.length}</h2>${p.v?'<div class="notice audio">This is a clip and has audio. Check your volume before playing.</div>':''}
+  return `<h2>Post ${i+1} of ${POSTS.length}</h2>
+  ${p.v?'<div class="notice audio">This is a clip and has audio. Check your volume before playing.</div>':''}
   <div class="media" id="media" ${mAttr(i+1,p.u)}></div>
   <details ${i===0?'open':''}><summary>Instructions</summary>
     <p>Decide whether this post should be approved or deleted, then briefly explain why. Begin your answer with &ldquo;approve&rdquo; or &ldquo;delete&rdquo;, then comment on whichever of these apply (skipping any with nothing meaningful to note):</p>
@@ -173,7 +164,8 @@ function review(){
   const miss=missing(),ie=introErr();
   return `<h2>Review &amp; submit</h2>
   <div class="rev ${ie?'bad':''}"><b>Your details</b> <a href="#" onclick="go(0);return false">edit</a>${ie?` <span class="d">${esc(ie)}</span>`:''}
-    <pre>${esc(S.userId)} &middot; ${esc(S.discord)}</pre></div>${S.posts.map((a,i)=>{const bad=!a.d?"No decision chosen":!a.t.trim()?"Reasoning missing":"";
+    <pre>${esc(S.userId)} &middot; ${esc(S.discord)}</pre></div>
+  ${S.posts.map((a,i)=>{const bad=!a.d?"No decision chosen":!a.t.trim()?"Reasoning missing":"";
     return `<div class="rev ${bad?'bad':''}"><b>Post ${i+1}</b> <a href="#" onclick="go(${i+1});return false">edit</a>${bad?` <span class="d">${bad}</span>`:''}
     <pre>${a.d?esc(answerText(a)):''}</pre></div>`;}).join("")}
   <div class="err" id="err">${miss.length?unf(miss):''}</div>
@@ -206,7 +198,6 @@ function done(){
 const fname=()=>"application-"+(S.userId||"applicant").replace(/[^\w-]/g,"_")+".html";
 function dl(){const b=new Blob([reportHtml()],{type:"text/html"});const a=document.createElement("a");
   a.href=URL.createObjectURL(b);a.download=fname();a.click();URL.revokeObjectURL(a.href);}
-// A self-contained page staff can open in a browser. It also carries the raw data so the reviewer can load it.
 function reportHtml(){
   const P=payload(),j=JSON.stringify(P).replace(/</g,"\\u003c");
   const bad=`onerror="this.replaceWith(Object.assign(document.createElement('a'),{href:this.src,textContent:'Media could not be loaded. Open it directly.'}))"`;
@@ -224,10 +215,10 @@ h2{font-size:15px;color:#e8c446;margin:0 0 8px}.b{font-size:12px;padding:1px 8px
 .approve{background:#4ccf5f}.delete{background:#ff5a5a}.m{background:#000;text-align:center;padding:8px;overflow:auto}
 .m img,.m video{max-width:100%;height:auto;vertical-align:top}.s{font-size:12px;margin:4px 0}pre{white-space:pre-wrap;font:inherit;margin:8px 0 0}
 </style></head><body><h1>Janitor application stage 2: ${esc("#"+P.e6ai_user_id)}</h1>
-<div class="i">Discord: ${esc(P.discord_username)} &middot; Submitted ${esc(P.submitted)}</div>${sec}<script type="application/json" id="app-data">${j}<\/script></body></html>`;
+<div class="i">Discord: ${esc(P.discord_username)} &middot; Submitted ${esc(P.submitted)}</div>
+${sec}<script type="application/json" id="app-data">${j}<\/script></body></html>`;
 }
 
-// ---- Reviewer (open this file with #review on the end) -----------------
 let R={apps:[],cur:0},G={};
 try{G=JSON.parse(localStorage.getItem(KEY+"-grades")||"{}");}catch(e){}
 const gk=a=>a.discord_username+(a.e6ai_user_id||"");
@@ -256,7 +247,7 @@ function rview(){
      <div class="media" style="margin-top:6px" ${mAttr(x.post,x.url)}></div>
      <pre>${esc(x.answer)}</pre>
      <div class="row"><select onchange="setG(${i},'s',this.value)" class="btn"><option value="">Score</option>${[0,1,2].map(n=>`<option ${g.s==n&&g.s!==undefined&&g.s!==""?'selected':''}>${n}</option>`).join("")}</select>
-     <input style="flex:1" placeholder="Notes" value="${esc(g.c\vert{}\vert{}"")}" onchange="setG(${i},'c',this.value)"></div></div>`;}).join("")+
+     <input style="flex:1" placeholder="Notes" value="${esc(g.c||"")}" onchange="setG(${i},'c',this.value)"></div></div>`;}).join("")+
    `<label>Overall notes</label><textarea style="min-height:90px" onchange="setG(-1,'n',this.value)">${esc((G[gk(a)]||{}).n||"")}</textarea>`;
   document.querySelectorAll("#rmain .media").forEach(mount);
 }
