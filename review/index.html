@@ -144,7 +144,7 @@ const uidOf=a=>String(stage===1?a.user_id:a.e6ai_user_id||"").replace(/\D/g,"");
 const label=a=>uidOf(a)?"#"+uidOf(a)+" "+a.discord_username:(a.e6ai_username||a.discord_username);
 function sum(a){let ap=0,de=0;a.answers.forEach(x=>{const d=dec(x);if(d==="approve")ap++;else if(d==="delete")de++;});
   return `<span class="sum" title="${ap} approved, ${de} deleted">(<span class="a">${ap}</span>/<span class="d">${de}</span>)</span>`;}
-function verdict(x){const d=dec(x),b=d==="approve"?["ok","Approved"]:d==="delete"?["bad","Deleted"]:null;
+function verdict(x){const d=dec(x),b=d===approve?["ok","Approved"]:d==="delete"?["bad","Deleted"]:null;
   return b?`<span class="badge ${b[0]}">${b[1]}</span><pre>${esc(x.answer.trim().replace(/^\S+\s*/,""))}</pre>`:`<span class="badge none">No clear decision</span><pre>${esc(x.answer)}</pre>`;}
 const heading=a=>uidOf(a)?`<a href="https://e6ai.net/users/${uidOf(a)}" target="_blank" rel="noopener" title="Open this user's profile on e6ai">User #${uidOf(a)}</a> &middot; ${esc(a.discord_username)}`:(a.e6ai_username?`<a href="https://e6ai.net/users?search%5Bname_matches%5D=${encodeURIComponent(a.e6ai_username)}" target="_blank" rel="noopener" title="Search for this username on e6ai">${esc(a.e6ai_username)}</a>`:"Unknown user")+` &middot; ${esc(a.discord_username)}`;
 function tag(a){
@@ -160,7 +160,7 @@ function show2(){
   const a=apps[cur];
   if(!a){$("#main").innerHTML='<h2>No applications yet</h2><p class="small">New submissions appear here after you press Refresh.</p>';return;}
   $("#main").innerHTML=`<h2>${heading(a)}${sum(a)}</h2>
-    <p class="small">${esc(a.email)} &middot; ${esc(new Date(a.submitted).toLocaleString())}</p>`+
+    <p class="small">${esc(new Date(a.submitted).toLocaleString())}</p>`+
   a.answers.map((x,i)=>{const g=gr(a,i);
     return `<div class="rev"><b>Post ${esc(x.post)}</b>
       <div class="media" data-n="${esc(x.post)}" data-e="${esc(ext(x.url))}" data-u="${esc(x.url)}"></div>
@@ -174,7 +174,7 @@ function show1(){
   if(!a){$("#main").innerHTML='<h2>No applications yet</h2><p class="small">New submissions appear here after you press Refresh.</p>';return;}
   const g=G[a._f]||{},d=g.d||"";
   $("#main").innerHTML=`<h2>${heading(a)}</h2>
-    <p class="small">${esc(a.email)} &middot; Timezone: ${esc(a.timezone)} &middot; 18+: <span class="${a.over18==="yes"?"a":"d"}">${esc(a.over18||"unanswered")}</span> &middot; Referred by: ${esc(a.referral||"nobody listed")} &middot; ${esc(new Date(a.submitted).toLocaleString())}</p>
+    <p class="small">Timezone: ${esc(a.timezone)} &middot; 18+: <span class="${a.over18==="yes"?"a":"d"}">${esc(a.over18||"unanswered")}</span> &middot; Referred by: ${esc(a.referral||"nobody listed")} &middot; ${esc(new Date(a.submitted).toLocaleString())}</p>
     <div class="row" style="margin-top:0"><b>Decision</b><select class="btn" onchange="setStatus(this.value)">${STATUS.map(([v,t])=>`<option value="${v}" ${d===v?"selected":""}>${t}</option>`).join("")}</select></div>`+
   a.answers.map((x,i)=>`<div class="rev"><b style="white-space:pre-wrap">${esc(x.q)}</b>
       <pre>${esc(x.answer)}</pre>
@@ -185,20 +185,20 @@ function csv(){stage===1?csv1():csv2();}
 function csv1(){
   const q=v=>{v=String(v??"");if(/^[=+\-@\t\r]/.test(v))v="'"+v;return '"'+v.replace(/"/g,'""')+'"';};
   const qs=[];apps.forEach(a=>a.answers.forEach(x=>{if(!qs.includes(x.q))qs.push(x.q);}));
-  const h=["submitted","user_id","email","discord","timezone","over18","referral","decision"];
+  const h=["submitted","user_id","discord","timezone","over18","referral","decision"];
   qs.forEach((t,i)=>h.push("q"+(i+1)+": "+t.replace(/\s+/g," ").slice(0,80),"q"+(i+1)+"_notes"));h.push("overall_notes");
   const rows=apps.map(a=>{const g=G[a._f]||{};
     const cells=qs.flatMap(t=>{const i=a.answers.findIndex(x=>x.q===t);return i<0?["",""]:[a.answers[i].answer,gr(a,i).c??""];});
-    return [a.submitted,a.user_id,a.email,a.discord_username,a.timezone,a.over18,a.referral,(STATUS.find(x=>x[0]===(g.d||""))||[0,""])[1],...cells,g.n||""];});
+    return [a.submitted,a.user_id,a.discord_username,a.timezone,a.over18,a.referral,(STATUS.find(x=>x[0]===(g.d||""))||[0,""])[1],...cells,g.n||""];});
   download([h,...rows].map(r=>r.map(q).join(",")).join("\n"),"janitor-stage1-results.csv");
 }
 function download(text,name){
   const b=new Blob([text],{type:"text/csv"}),l=document.createElement("a");l.href=URL.createObjectURL(b);l.download=name;l.click();URL.revokeObjectURL(l.href);
 }
 function csv2(){
-  const q=v=>{v=String(v??"");if(/^[=+\-@\t\r]/.test(v))v="'"+v;return '"'+v.replace(/"/g,'""')+'"';},n=Math.max(0,...apps.map(a=>a.answers.length)),h=["submitted","user_id","email","discord"];
+  const q=v=>{v=String(v??"");if(/^[=+\-@\t\r]/.test(v))v="'"+v;return '"'+v.replace(/"/g,'""')+'"';},n=Math.max(0,...apps.map(a=>a.answers.length)),h=["submitted","user_id","discord"];
   for(let i=1;i<=n;i++)h.push("p"+i+"_decision","p"+i+"_notes");h.push("overall_notes");
-  const rows=apps.map(a=>[a.submitted,uidOf(a)||a.e6ai_username||"",a.email,a.discord_username,...a.answers.flatMap((x,i)=>[dec(x),gr(a,i).c??""]),(G[a._f]||{}).n||""]);
+  const rows=apps.map(a=>[a.submitted,uidOf(a)||a.e6ai_username||"",a.discord_username,...a.answers.flatMap((x,i)=>[dec(x),gr(a,i).c??""]),(G[a._f]||{}).n||""]);
   download([h,...rows].map(r=>r.map(q).join(",")).join("\n"),"janitor-results.csv");
 }
 
