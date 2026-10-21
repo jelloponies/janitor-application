@@ -106,7 +106,7 @@ function mount(el){
   el.addEventListener("error",()=>{if(++k<u.length)el.src=u[k];else{const t=document.createElement("span");t.className="logo";t.textContent="e6AI";el.replaceWith(t);}});
   el.src=u[0];})();
 const KEY = "e6ai-janitor-stage2";
-let S = {step:0, email:"", userId:"", discord:"", posts:POSTS.map(()=>({d:"",t:""})), done:false};
+let S = {step:0, adult:false, email:"", userId:"", discord:"", posts:POSTS.map(()=>({d:"",t:""})), done:false};
 try{const r=localStorage.getItem(KEY); if(r) S=Object.assign(S,JSON.parse(r));}catch(e){}
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -274,8 +274,17 @@ function csv(){
 }
 window.addEventListener("hashchange",()=>location.reload());
 
+function gate(){
+  return `<h2>Adult content notice</h2>
+  <div class="notice audio"><b>This stage contains explicit adult content.</b></div>
+  <p>The posts in this application include sexual and other mature material. You must be at least 18 years old to continue, and you must be allowed to view this kind of content where you live.</p>
+  <div class="row"><button class="btn sel-a" onclick="S.adult=true;save();render()">I am 18 or older, continue</button>
+    <button class="btn sel-d" onclick="gateNo()">I am under 18</button></div>`;
+}
+function gateNo(){$("#main").innerHTML='<h2>Sorry</h2><p>This stage of the application is only open to people who are at least 18 years old.</p>';}
 function render(){
   if(location.hash==="#review")return reviewer();
+  if(!S.adult){$("#queue").innerHTML="";$("#main").innerHTML=gate();return;}
   queue();
   const m=$("#main");
   if(S.done)m.innerHTML=done();
