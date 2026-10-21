@@ -18,6 +18,8 @@ header .stage{color:var(--accent);font-size:18px;font-weight:bold}
 .tabs{display:flex;gap:6px;margin-bottom:8px}.tabs .btn{flex:1}
 .btn.on{background:var(--accent);border-color:var(--accent);color:#000}
 main h2 a{color:var(--accent);border-bottom:1px dotted var(--accent)}main h2 a:hover{color:var(--hover);border-color:var(--hover)}
+.badge{display:inline-block;padding:2px 14px;border-radius:2px;color:#000;font-weight:bold;margin:6px 0 2px}.badge.ok{background:var(--ok)}.badge.bad{background:var(--bad)}.badge.none{background:var(--nav);color:var(--muted)}
+.sum{font-size:inherit;font-weight:bold;margin-left:6px;white-space:nowrap}
 .st-advance{color:var(--ok)}.st-reject{color:var(--bad)}.st-hold{color:var(--muted)}
 .wrap{display:flex;gap:14px;max-width:1280px;margin:14px auto;padding:0 12px;align-items:flex-start}
 aside{width:230px;flex:none;background:var(--panel);padding:10px;border-radius:3px}
@@ -135,10 +137,14 @@ function setG(i,f,v){
 const STATUS=[["","Undecided"],["advance","Advance to stage 2"],["hold","Hold"],["reject","Reject"]];
 const uidOf=a=>String(stage===1?a.user_id:a.e6ai_user_id||"").replace(/\D/g,"");
 const label=a=>uidOf(a)?"#"+uidOf(a)+" "+a.discord_username:(a.e6ai_username||a.discord_username);
+function sum(a){let ap=0,de=0;a.answers.forEach(x=>{const d=dec(x);if(d==="approve")ap++;else if(d==="delete")de++;});
+  return `<span class="sum" title="${ap} approved, ${de} deleted">(<span class="a">${ap}</span>/<span class="d">${de}</span>)</span>`;}
+function verdict(x){const d=dec(x),b=d==="approve"?["ok","Approved"]:d==="delete"?["bad","Deleted"]:null;
+  return b?`<span class="badge ${b[0]}">${b[1]}</span><pre>${esc(x.answer.trim().replace(/^\S+\s*/,""))}</pre>`:`<span class="badge none">No clear decision</span><pre>${esc(x.answer)}</pre>`;}
 const heading=a=>uidOf(a)?`<a href="https://e6ai.net/users/${uidOf(a)}" target="_blank" rel="noopener" title="Open this user's profile on e6ai">User #${uidOf(a)}</a> &middot; ${esc(a.discord_username)}`:`${esc(a.e6ai_username||"Unknown user")} &middot; ${esc(a.discord_username)}`;
 function tag(a){
   if(stage===1){const d=(G[a._f]||{}).d||"";return d?`<span class="tag st-${esc(d)}">${esc((STATUS.find(x=>x[0]===d)||[0,d])[1].replace(" to stage 2",""))}</span>`:'<span class="tag a">new</span>';}
-  return "";
+  return `<span class="tag">${sum(a)}</span>`;
 }
 function renderList(){
   $("#list").innerHTML=apps.length?apps.map((a,i)=>`<li><button class="${i===cur?'cur':''}" onclick="cur=${i};renderList();show()"><span>${esc(label(a))}</span>${tag(a)}</button></li>`).join(""):'<li class="small">No applications yet.</li>';
@@ -148,12 +154,12 @@ function show(){stage===1?show1():show2();}
 function show2(){
   const a=apps[cur];
   if(!a){$("#main").innerHTML='<h2>No applications yet</h2><p class="small">New submissions appear here after you press Refresh.</p>';return;}
-  $("#main").innerHTML=`<h2>${heading(a)}</h2>
+  $("#main").innerHTML=`<h2>${heading(a)}${sum(a)}</h2>
     <p class="small">${esc(a.email)} &middot; ${esc(new Date(a.submitted).toLocaleString())}</p>`+
   a.answers.map((x,i)=>{const g=gr(a,i);
     return `<div class="rev"><b>Post ${esc(x.post)}</b>
       <div class="media" data-n="${esc(x.post)}" data-e="${esc(ext(x.url))}" data-u="${esc(x.url)}"></div>
-      <pre>${esc(x.answer)}</pre>
+      ${verdict(x)}
       <div class="row"><input style="flex:1" placeholder="Notes" value="${esc(g.c||"")}" onchange="setG(${i},'c',this.value)"></div></div>`;}).join("")+
   `<label>Overall notes</label><textarea onchange="setG(-1,'n',this.value)">${esc((G[a._f]||{}).n||"")}</textarea>`;
   document.querySelectorAll("#main .media").forEach(mount);
