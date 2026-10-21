@@ -106,7 +106,7 @@ function mount(el){
   el.addEventListener("error",()=>{if(++k<u.length)el.src=u[k];else{const t=document.createElement("span");t.className="logo";t.textContent="e6AI";el.replaceWith(t);}});
   el.src=u[0];})();
 const KEY = "e6ai-janitor-stage2";
-let S = {step:0, email:"", username:"", discord:"", posts:POSTS.map(()=>({d:"",t:""})), done:false};
+let S = {step:0, email:"", userId:"", discord:"", posts:POSTS.map(()=>({d:"",t:""})), done:false};
 try{const r=localStorage.getItem(KEY); if(r) S=Object.assign(S,JSON.parse(r));}catch(e){}
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -127,15 +127,15 @@ function intro(){
   <p>This time around you will be looking through examples of posts you might stumble upon in the pending queue. As a reminder, your main role as janitor is to handle post curation on the site, by following the <a href="${GUIDE}" target="_blank" rel="noopener">uploading guidelines</a> and your own discretion.</p>
   <p>Keep in mind that this is a fairly <b>lengthy questionnaire</b>, it will take a while to get through. Please take your time and feel free to take breaks in-between. Your progress is saved in this browser as you go.</p>
   <label for="email">Email *</label><input id="email" type="email" value="${esc(S.email)}" autocomplete="email">
-  <label for="username">What is your e6ai username? *</label><input id="username" value="${esc(S.username)}">
+  <label for="userid">What is your e6ai user ID number? *</label><input id="userid" value="${esc(S.userId)}" inputmode="numeric">
   <label for="discord">What is your Discord username (not display name)? *</label><input id="discord" value="${esc(S.discord)}">
   <div class="err" id="err"></div>
   <div class="row"><button class="btn sp" onclick="saveIntro()">Begin pending queue</button></div>`;
 }
-function readIntro(){S.email=$("#email").value.trim();S.username=$("#username").value.trim();S.discord=$("#discord").value.trim();}
+function readIntro(){S.email=$("#email").value.trim();S.userId=$("#userid").value.trim();S.discord=$("#discord").value.trim();}
 function introErr(){
   if(!/^\S+@\S+\.\S+$/.test(S.email))return "Enter a valid email address.";
-  if(!S.username)return "Enter your e6ai username.";
+  if(!/^#?\d{1,12}$/.test(S.userId))return "Enter your e6ai user ID as a number only, for example 12345.";
   if(!S.discord)return "Enter your Discord username.";
   return "";
 }
@@ -176,7 +176,7 @@ function review(){
   const miss=missing(),ie=introErr();
   return `<h2>Review &amp; submit</h2>
   <div class="rev ${ie?'bad':''}"><b>Your details</b> <a href="#" onclick="go(0);return false">edit</a>${ie?` <span class="d">${esc(ie)}</span>`:''}
-    <pre>${esc(S.username)} &middot; ${esc(S.email)} &middot; ${esc(S.discord)}</pre></div>
+    <pre>${esc(S.userId)} &middot; ${esc(S.email)} &middot; ${esc(S.discord)}</pre></div>
   ${S.posts.map((a,i)=>{const bad=!a.d?"No decision chosen":!a.t.trim()?"Reasoning missing":"";
     return `<div class="rev ${bad?'bad':''}"><b>Post ${i+1}</b> <a href="#" onclick="go(${i+1});return false">edit</a>${bad?` <span class="d">${bad}</span>`:''}
     <pre>${a.d?esc(answerText(a)):''}</pre></div>`;}).join("")}
@@ -184,7 +184,7 @@ function review(){
   <div class="row"><button class="btn" onclick="go(${POSTS.length})">Previous</button>
     <button class="btn sp" onclick="submitAll()">Submit application</button></div>`;
 }
-function payload(){return {submitted:new Date().toISOString(),email:S.email,e6ai_username:S.username,discord_username:S.discord,
+function payload(){return {submitted:new Date().toISOString(),email:S.email,e6ai_user_id:S.userId.replace(/^#/,""),discord_username:S.discord,
   answers:S.posts.map((a,i)=>({post:i+1,url:POSTS[i].u,answer:answerText(a)}))};}
 async function submitAll(){
   const miss=missing();
@@ -193,7 +193,7 @@ async function submitAll(){
     try{let r;
       if(/discord(app)?\.com\/api\/webhooks\//.test(SUBMIT_URL)){
         const fd=new FormData();
-        fd.append("payload_json",JSON.stringify({content:"Janitor application: **"+S.username+"** (Discord: "+S.discord+")"}));
+        fd.append("payload_json",JSON.stringify({content:"Janitor application: **user #"+S.userId+"** (Discord: "+S.discord+")"}));
         fd.append("files[0]",new Blob([reportHtml()],{type:"text/html"}),fname());
         r=await fetch(SUBMIT_URL,{method:"POST",body:fd});
       }else r=await fetch(SUBMIT_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload())});
@@ -207,7 +207,7 @@ function done(){
   <p class="small">${SUBMIT_URL?'Your response has been recorded.':'This copy of the form has no submission endpoint, so your answers only exist here. Download them and send the file to staff.'}</p>
   ${SUBMIT_URL?'':'<div class="row"><button class="btn" onclick="dl()">Download answers</button></div>'}`;
 }
-const fname=()=>"application-"+(S.username||"applicant").replace(/[^\w-]/g,"_")+".html";
+const fname=()=>"application-"+(S.userId||"applicant").replace(/[^\w-]/g,"_")+".html";
 function dl(){const b=new Blob([reportHtml()],{type:"text/html"});const a=document.createElement("a");
   a.href=URL.createObjectURL(b);a.download=fname();a.click();URL.revokeObjectURL(a.href);}
 // A self-contained page staff can open in a browser. It also carries the raw data so the reviewer can load it.
@@ -220,14 +220,14 @@ function reportHtml(){
 <p class="s"><a href="${esc(x.url)}" target="_blank" rel="noopener">Original link</a></p>
 <pre>${esc(S.posts[i].t.trim())}</pre></section>`;}).join("");
   return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="referrer" content="no-referrer">
-<title>Janitor application: ${esc(P.e6ai_username)}</title><style>
+<title>Janitor application: ${esc("#"+P.e6ai_user_id)}</title><style>
 :root{color-scheme:dark}body{margin:0 auto;max-width:960px;padding:18px;background:#000;color:#fff;font:14px/1.5 Verdana,Tahoma,sans-serif}
 a{color:#ffee95;text-decoration:none}a:hover{color:#f68b00}h1{color:#e8c446;font-size:20px;margin:0 0 4px}
 .i{color:#cbb295;font-size:12px;margin-bottom:16px}section{background:#222;border-radius:3px;padding:10px 14px;margin-bottom:14px}
 h2{font-size:15px;color:#e8c446;margin:0 0 8px}.b{font-size:12px;padding:1px 8px;border-radius:2px;color:#000;margin-left:6px}
 .approve{background:#4ccf5f}.delete{background:#ff5a5a}.m{background:#000;text-align:center;padding:8px;overflow:auto}
 .m img,.m video{max-width:100%;height:auto;vertical-align:top}.s{font-size:12px;margin:4px 0}pre{white-space:pre-wrap;font:inherit;margin:8px 0 0}
-</style></head><body><h1>Janitor application stage 2: ${esc(P.e6ai_username)}</h1>
+</style></head><body><h1>Janitor application stage 2: ${esc("#"+P.e6ai_user_id)}</h1>
 <div class="i">Discord: ${esc(P.discord_username)} &middot; Email: ${esc(P.email)} &middot; Submitted ${esc(P.submitted)}</div>
 ${sec}<script type="application/json" id="app-data">${j}<\/script></body></html>`;
 }
@@ -252,9 +252,9 @@ function reviewer(){
     (Array.isArray(j)?j:[j]).forEach(x=>{if(x&&Array.isArray(x.answers)&&!R.apps.some(y=>gk(y)===gk(x)))R.apps.push(x);});}catch(x){}}rview();};
 }
 function rview(){
-  $("#alist").innerHTML=R.apps.map((a,i)=>`<li><button class="${i===R.cur?'cur':''}" onclick="R.cur=${i};rview()">${esc(a.e6ai_username)}<span class="tag">${total(a)}/${a.answers.length*2}</span></button></li>`).join("");
+  $("#alist").innerHTML=R.apps.map((a,i)=>`<li><button class="${i===R.cur?'cur':''}" onclick="R.cur=${i};rview()">${esc(a.e6ai_user_id?"#"+a.e6ai_user_id:a.e6ai_username)}<span class="tag">${total(a)}/${a.answers.length*2}</span></button></li>`).join("");
   const a=R.apps[R.cur];if(!a)return;
-  $("#rmain").innerHTML=`<h2>${esc(a.e6ai_username)}</h2>
+  $("#rmain").innerHTML=`<h2>${esc(a.e6ai_user_id?"#"+a.e6ai_user_id:a.e6ai_username)}</h2>
    <p class="small">${esc(a.email)} &middot; Discord: ${esc(a.discord_username)} &middot; Score ${total(a)}/${a.answers.length*2} (0 poor, 1 okay, 2 good)</p>`+
    a.answers.map((x,i)=>{const g=gr(a,i),k=ANSWER_KEY[i],d=dec(x);
     return `<div class="rev"><b>Post ${x.post}</b>${k?` <span class="${d===k?'a':'d'}">${d===k?'matches key':'key says '+esc(k)}</span>`:''}
@@ -266,9 +266,9 @@ function rview(){
   document.querySelectorAll("#rmain .media").forEach(mount);
 }
 function csv(){
-  const q=v=>'"'+String(v??"").replace(/"/g,'""')+'"',n=POSTS.length,h=["e6ai_username","email","discord"];
+  const q=v=>'"'+String(v??"").replace(/"/g,'""')+'"',n=POSTS.length,h=["e6ai_user_id","email","discord"];
   for(let i=1;i<=n;i++)h.push("p"+i+"_decision","p"+i+"_score","p"+i+"_notes");h.push("total","overall_notes");
-  const rows=R.apps.map(a=>[a.e6ai_username,a.email,a.discord_username,...a.answers.flatMap((x,i)=>[dec(x),gr(a,i).s??"",gr(a,i).c??""]),total(a),(G[gk(a)]||{}).n||""]);
+  const rows=R.apps.map(a=>[a.e6ai_user_id||a.e6ai_username,a.email,a.discord_username,...a.answers.flatMap((x,i)=>[dec(x),gr(a,i).s??"",gr(a,i).c??""]),total(a),(G[gk(a)]||{}).n||""]);
   const b=new Blob([[h,...rows].map(r=>r.map(q).join(",")).join("\n")],{type:"text/csv"});
   const l=document.createElement("a");l.href=URL.createObjectURL(b);l.download="janitor-results.csv";l.click();URL.revokeObjectURL(l.href);
 }
@@ -283,7 +283,7 @@ function render(){
   else if(S.step<=POSTS.length)m.innerHTML=postView(S.step-1);
   else m.innerHTML=review();
   m.querySelectorAll(".media").forEach(mount);
-  const intro_=$("#email");if(intro_)["email","username","discord"].forEach(id=>$("#"+id).addEventListener("input",()=>{readIntro();save();}));
+  const intro_=$("#email");if(intro_)["email","userid","discord"].forEach(id=>$("#"+id).addEventListener("input",()=>{readIntro();save();}));
 }
 render();
 </script>
