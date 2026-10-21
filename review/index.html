@@ -61,19 +61,24 @@ const MEDIA = "../stage-2/posts/";
 const LS = "e6ai-janitor-review";
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-let stage = location.hash === "#stage1" ? 1 : 2;
+const hashStage = () => location.hash === "#stage1" ? 1 : location.hash === "#stage2" ? 2 : 0;
+const savedStage = () => { try { return +localStorage.getItem(LS+"-stage") === 2 ? 2 : 1; } catch(e) { return 1; } };
+const saveStage = () => { try { localStorage.setItem(LS+"-stage", stage); } catch(e) {} };
+// Opens on the stage in the link (#stage1 / #stage2), otherwise the stage you last viewed, otherwise stage 1.
+let stage = hashStage() || savedStage();
 let key = "", apps = [], cur = 0, G = {};
 const GK = () => LS + (stage === 1 ? "-grades1" : "-grades");
-const DIR = () => stage === 1 ? "stage1" : "applications";
+const DIR = () => stage === 1 ? "stage1" : "stage2";
 try{key=localStorage.getItem(LS+"-key")||"";}catch(e){}
 function loadG(){try{G=JSON.parse(localStorage.getItem(GK())||"{}");}catch(e){G={};}}
 const gsave=()=>{try{localStorage.setItem(GK(),JSON.stringify(G));}catch(e){}};
 function setStage(n){
-  if(n!==stage){stage=n;try{history.replaceState(null,"",n===1?"#stage1":location.pathname+location.search);}catch(e){}}
+  if(n!==stage){stage=n;}
+  saveStage();try{history.replaceState(null,"","#stage"+n);}catch(e){}
   loadG();apps=[];cur=0;tabs();key?load():login();
 }
 function tabs(){const a=$("#t1"),b=$("#t2");if(a)a.classList.toggle("on",stage===1);if(b)b.classList.toggle("on",stage===2);}
-window.addEventListener("hashchange",()=>{const n=location.hash==="#stage1"?1:2;if(n!==stage)setStage(n);});
+window.addEventListener("hashchange",()=>{const n=hashStage();if(n&&n!==stage)setStage(n);});
 
 (function(){const el=$("#logo"),u=["../stage-2/logo.svg","https://e6ai.net/vite/assets/default-CKI9Mcpt.svg"];let k=0;
   el.referrerPolicy="no-referrer";
@@ -141,7 +146,7 @@ function sum(a){let ap=0,de=0;a.answers.forEach(x=>{const d=dec(x);if(d==="appro
   return `<span class="sum" title="${ap} approved, ${de} deleted">(<span class="a">${ap}</span>/<span class="d">${de}</span>)</span>`;}
 function verdict(x){const d=dec(x),b=d==="approve"?["ok","Approved"]:d==="delete"?["bad","Deleted"]:null;
   return b?`<span class="badge ${b[0]}">${b[1]}</span><pre>${esc(x.answer.trim().replace(/^\S+\s*/,""))}</pre>`:`<span class="badge none">No clear decision</span><pre>${esc(x.answer)}</pre>`;}
-const heading=a=>uidOf(a)?`<a href="https://e6ai.net/users/${uidOf(a)}" target="_blank" rel="noopener" title="Open this user's profile on e6ai">User #${uidOf(a)}</a> &middot; ${esc(a.discord_username)}`:`${esc(a.e6ai_username||"Unknown user")} &middot; ${esc(a.discord_username)}`;
+const heading=a=>uidOf(a)?`<a href="https://e6ai.net/users/${uidOf(a)}" target="_blank" rel="noopener" title="Open this user's profile on e6ai">User #${uidOf(a)}</a> &middot; ${esc(a.discord_username)}`:(a.e6ai_username?`<a href="https://e6ai.net/users?search%5Bname_matches%5D=${encodeURIComponent(a.e6ai_username)}" target="_blank" rel="noopener" title="Search for this username on e6ai">${esc(a.e6ai_username)}</a>`:"Unknown user")+` &middot; ${esc(a.discord_username)}`;
 function tag(a){
   if(stage===1){const d=(G[a._f]||{}).d||"";return d?`<span class="tag st-${esc(d)}">${esc((STATUS.find(x=>x[0]===d)||[0,d])[1].replace(" to stage 2",""))}</span>`:'<span class="tag a">new</span>';}
   return `<span class="tag">${sum(a)}</span>`;
@@ -197,7 +202,7 @@ function csv2(){
   download([h,...rows].map(r=>r.map(q).join(",")).join("\n"),"janitor-results.csv");
 }
 
-loadG();key?load():login();
+saveStage();loadG();key?load():login();
 </script>
 </body>
 </html>
