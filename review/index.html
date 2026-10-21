@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex">
+<title>Janitor applications: review</title>
+<style>
+:root{--bg:#000;--panel:#222;--nav:#333;--line:#4d4d4d;--link:#ffee95;--hover:#f68b00;--accent:#e8c446;--text:#fff;--muted:#cbb295;--ok:#4ccf5f;--bad:#ff5a5a;--input:#333;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 Verdana,Tahoma,sans-serif}
+a{color:var(--link);text-decoration:none}a:hover{color:var(--hover)}
+header{background:var(--panel);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:18px;padding:6px 14px}
+header img{display:block;height:32px;width:auto}header .logo{font-size:22px;font-weight:bold;color:var(--accent)}
+header .stage{color:var(--accent);font-size:18px;font-weight:bold}
+.wrap{display:flex;gap:14px;max-width:1280px;margin:14px auto;padding:0 12px;align-items:flex-start}
+aside{width:230px;flex:none;background:var(--panel);padding:10px;border-radius:3px}
+aside h3,main h2{margin:0 0 8px;font-size:15px;color:var(--accent)}
+aside ol{list-style:none;margin:0;padding:0}
+aside li button{all:unset;display:flex;width:100%;gap:6px;padding:3px 4px;cursor:pointer;color:var(--link);border-radius:2px;box-sizing:border-box}
+aside li button:hover{background:var(--nav);color:var(--hover)}
+aside li button.cur{background:var(--nav);color:var(--text);font-weight:bold}
+aside .tag{margin-left:auto;font-size:11px}
+.a{color:var(--ok)}.d{color:var(--bad)}
+main{flex:1;min-width:0;background:var(--panel);padding:14px 16px;border-radius:3px}
+.media{background:#000;text-align:center;padding:8px;margin:6px 0 10px;overflow:auto}
+.media img,.media video{max-width:100%;height:auto;vertical-align:top}
+.media .fail{padding:30px 10px;color:var(--muted)}.media .fail code{color:var(--text)}
+label{display:block;margin:12px 0 3px;font-weight:bold}
+input,textarea{width:100%;background:var(--input);color:var(--text);border:1px solid var(--line);padding:6px 8px;font:inherit;border-radius:2px}
+textarea{min-height:90px;resize:vertical}
+input:focus,textarea:focus,button:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.err{color:var(--bad);font-size:12px;min-height:16px}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;align-items:center}
+.btn{background:var(--nav);color:var(--link);border:1px solid var(--line);padding:6px 14px;font:inherit;cursor:pointer;border-radius:2px}
+.btn:hover{background:#000;color:var(--hover)}
+.rev{border-top:1px solid var(--line);padding:8px 0}
+.rev pre{white-space:pre-wrap;margin:4px 0 0;font:inherit;color:var(--text)}
+.small{color:var(--muted);font-size:12px}
+@media(max-width:800px){.wrap{flex-direction:column}aside{width:100%}}
+</style>
+</head>
+<body>
+<header><img id="logo" alt="e6AI" height="32"><span class="stage">Janitor applications: review</span></header>
+<div class="wrap" id="wrap"></div>
+<script>
+// ---- Config -------------------------------------------------------------
+// Address of your Cloudflare Worker, without a trailing slash.
+const WORKER = "https://janitor-intake.jelloponies.workers.dev";
+// Post media is looked up here first (same files as the applicant page), then at the original link.
+const MEDIA = "../stage-2/posts/";
+// Optional answer key, one entry per post, e.g. ["delete","approve",...]. Leave empty to skip checking.
+const ANSWER_KEY = [];
+
+const LS = "e6ai-janitor-review";
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let key = "", apps = [], cur = 0, G = {};
+try{key=localStorage.getItem(LS+"-key")||"";G=JSON.parse(localStorage.getItem(LS+"-grades")||"{}");}catch(e){}
+const gsave=()=>{try{localStorage.setItem(LS+"-grades",JSON.stringify(G));}catch(e){}};
+
+(function(){const el=$("#logo"),u=["../stage-2/logo.svg","https://e6ai.net/vite/assets/default-CKI9Mcpt.svg"];let k=0;
+  el.referrerPolicy="no-referrer";
+  el.addEventListener("error",()=>{if(++k<u.length)el.src=u[k];else{const t=document.createElement("span");t.className="logo";t.textContent="e6AI";el.replaceWith(t);}});
+  el.src=u[0];})();
+
+function mount(el){
+  const urls=[MEDIA+"post-"+el.dataset.n+"."+el.dataset.e,el.dataset.u],vid=/^(mp4|webm)$/.test(el.dataset.e);let k=0;
+  const n=document.createElement(vid?"video":"img");
+  if(vid){n.controls=true;n.preload="metadata";}else n.alt="";
+  n.referrerPolicy="no-referrer";
+  n.addEventListener("error",()=>{if(++k<urls.length){n.src=urls[k];return;}
+    el.innerHTML=`<div class="fail">This ${vid?"clip":"image"} could not be loaded. <a href="${esc(urls[1])}" target="_blank" rel="noopener">Open the original link</a>.</div>`;});
+  n.src=urls[0];el.appendChild(n);
+}
+
+// ---- Sign-in and loading -------------------------------------------------
+function login(msg){
+  $("#wrap").innerHTML=`<main style="max-width:520px;margin:30px auto"><h2>Staff sign-in</h2>
+    <p class="small">Enter the staff key you were given. It is stored in this browser only.</p>
+    <label for="k">Staff key</label><input id="k" type="password" autocomplete="off">
+    <div class="err">${esc(msg||"")}</div><div class="row"><button class="btn" id="go">Sign in</button></div></main>`;
+  $("#go").onclick=()=>{key=$("#k").value.trim();if(!key)return;try{localStorage.setItem(LS+"-key",key);}catch(e){}load();};
+  $("#k").addEventListener("keydown",e=>{if(e.key==="Enter")$("#go").click();});
+}
+function signOut(){try{localStorage.removeItem(LS+"-key");}catch(e){}key="";apps=[];login();}
+async function api(p){
+  const r=await fetch(WORKER+p,{headers:{Authorization:"Bearer "+key}});
+  if(r.status===401){const e=new Error("auth");e.auth=1;throw e;}
+  if(!r.ok)throw new Error("http "+r.status);
+  return r.json();
+}
+async function load(){
+  $("#wrap").innerHTML='<main style="max-width:520px;margin:30px auto"><p>Loading applications…</p></main>';
+  try{
+    const {files}=await api("/applications");apps=[];let i=0;
+    const w=async()=>{while(i<files.length){const n=files[i++];
+      try{const j=await api("/applications/"+encodeURIComponent(n));j._f=n;apps.push(j);}catch(e){if(e.auth)throw e;}}};
+    await Promise.all([1,2,3,4,5,6].map(w));
+    apps.sort((a,b)=>a._f<b._f?1:-1);cur=0;
+    $("#wrap").innerHTML=`<aside><h3>Applications</h3><ol id="list"></ol>
+      <div class="row"><button class="btn" onclick="load()">Refresh</button><button class="btn" onclick="csv()">Export CSV</button><button class="btn" onclick="signOut()">Sign out</button></div></aside><main id="main"></main>`;
+    renderList();show();
+  }catch(e){
+    if(e.auth){try{localStorage.removeItem(LS+"-key");}catch(x){}key="";login("That staff key was not accepted.");}
+    else $("#wrap").innerHTML='<main style="max-width:520px;margin:30px auto"><p class="d">Could not load applications. Check the Worker address and your connection.</p><div class="row"><button class="btn" onclick="load()">Try again</button><button class="btn" onclick="signOut()">Sign out</button></div></main>';
+  }
+}
+
+// ---- Scoring and display -------------------------------------------------
+const gr=(a,i)=>((G[a._f]||{}).p||[])[i]||{};
+const total=a=>a.answers.reduce((t,_,i)=>t+(+gr(a,i).s||0),0);
+const graded=a=>((G[a._f]||{}).p||[]).some(x=>x&&x.s!==undefined&&x.s!=="");
+const dec=x=>(x.answer.trim().split(/\s+/)[0]||"").toLowerCase().replace(/[^a-z]/g,"");
+const ext=u=>u.split("?")[0].split(".").pop().toLowerCase();
+function setG(i,f,v){
+  const a=apps[cur],g=G[a._f]=G[a._f]||{p:[],n:""};
+  if(i<0)g.n=v;else{g.p[i]=g.p[i]||{};g.p[i][f]=v;}
+  gsave();
+  if(f==="s"){$("#tot").textContent=total(a);renderList();}
+}
+function renderList(){
+  $("#list").innerHTML=apps.length?apps.map((a,i)=>`<li><button class="${i===cur?'cur':''}" onclick="cur=${i};renderList();show()">${esc(a.e6ai_username)}<span class="tag ${graded(a)?'':'a'}">${graded(a)?total(a)+'/'+a.answers.length*2:'new'}</span></button></li>`).join(""):'<li class="small">No applications yet.</li>';
+}
+function show(){
+  const a=apps[cur];
+  if(!a){$("#main").innerHTML='<h2>No applications yet</h2><p class="small">New submissions appear here after you press Refresh.</p>';return;}
+  $("#main").innerHTML=`<h2>${esc(a.e6ai_username)}</h2>
+    <p class="small">${esc(a.email)} &middot; Discord: ${esc(a.discord_username)} &middot; ${esc(new Date(a.submitted).toLocaleString())} &middot; Score <span id="tot">${total(a)}</span>/${a.answers.length*2} (0 poor, 1 okay, 2 good)</p>`+
+  a.answers.map((x,i)=>{const g=gr(a,i),k=ANSWER_KEY[i],d=dec(x),sv=g.s;
+    return `<div class="rev"><b>Post ${esc(x.post)}</b>${k?` <span class="${d===k?'a':'d'}">${d===k?'matches key':'key says '+esc(k)}</span>`:''}
+      <div class="media" data-n="${esc(x.post)}" data-e="${esc(ext(x.url))}" data-u="${esc(x.url)}"></div>
+      <pre>${esc(x.answer)}</pre>
+      <div class="row"><select class="btn" onchange="setG(${i},'s',this.value)"><option value="" ${sv===undefined||sv===""?"selected":""}>Score</option>${[0,1,2].map(n=>`<option ${String(sv)===String(n)?"selected":""}>${n}</option>`).join("")}</select>
+      <input style="flex:1" placeholder="Notes" value="${esc(g.c||"")}" onchange="setG(${i},'c',this.value)"></div></div>`;}).join("")+
+  `<label>Overall notes</label><textarea onchange="setG(-1,'n',this.value)">${esc((G[a._f]||{}).n||"")}</textarea>`;
+  document.querySelectorAll("#main .media").forEach(mount);
+}
+function csv(){
+  const q=v=>'"'+String(v??"").replace(/"/g,'""')+'"',n=Math.max(0,...apps.map(a=>a.answers.length)),h=["submitted","e6ai_username","email","discord"];
+  for(let i=1;i<=n;i++)h.push("p"+i+"_decision","p"+i+"_score","p"+i+"_notes");h.push("total","overall_notes");
+  const rows=apps.map(a=>[a.submitted,a.e6ai_username,a.email,a.discord_username,...a.answers.flatMap((x,i)=>[dec(x),gr(a,i).s??"",gr(a,i).c??""]),total(a),(G[a._f]||{}).n||""]);
+  const b=new Blob([[h,...rows].map(r=>r.map(q).join(",")).join("\n")],{type:"text/csv"});
+  const l=document.createElement("a");l.href=URL.createObjectURL(b);l.download="janitor-results.csv";l.click();URL.revokeObjectURL(l.href);
+}
+
+key?load():login();
+</script>
+</body>
+</html>
