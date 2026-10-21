@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>e6ai Janitor Application - Stage 2</title>
+<style>
+:root{--bg:#000;--panel:#222;--nav:#333;--line:#4d4d4d;--link:#ffee95;--hover:#f68b00;--accent:#e8c446;--text:#fff;--muted:#cbb295;--ok:#4ccf5f;--bad:#ff5a5a;--warn:#3d3300;--input:#333;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 Verdana,Tahoma,sans-serif}
+a{color:var(--link);text-decoration:none}a:hover{color:var(--hover)}
+header{background:var(--panel);border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;align-items:center;gap:4px 18px;padding:6px 14px}
+header img{display:block;height:32px;width:auto}
+header .logo{font-size:22px;font-weight:bold;color:var(--accent)}
+header .stage{color:var(--accent);font-size:18px;font-weight:bold}
+.wrap{display:flex;gap:14px;max-width:1280px;margin:14px auto;padding:0 12px;align-items:flex-start}
+aside{width:210px;flex:none;background:var(--panel);padding:10px;border-radius:3px}
+aside h3,main h2{margin:0 0 8px;font-size:15px;color:var(--accent)}
+aside ol{list-style:none;margin:0;padding:0}
+aside li button{all:unset;display:flex;width:100%;gap:6px;padding:3px 4px;cursor:pointer;color:var(--link);border-radius:2px}
+aside li button:hover{background:var(--nav);color:var(--hover)}
+aside li button.cur{background:var(--nav);color:var(--text);font-weight:bold}
+aside .tag{margin-left:auto;font-size:11px}
+.a{color:var(--ok)}.d{color:var(--bad)}
+main{flex:1;min-width:0;background:var(--panel);padding:14px 16px;border-radius:3px}
+.notice{background:var(--warn);border:1px solid var(--accent);padding:8px 10px;margin:0 0 12px;border-radius:2px}
+.audio{background:#3d1414;border-color:var(--bad)}
+.media{background:#000;text-align:center;padding:8px;margin-bottom:12px;overflow:auto}
+.media img,.media video{max-width:100%;height:auto;vertical-align:top}
+.media .fail{padding:30px 10px;color:var(--muted)}
+.media .fail code{color:var(--text)}
+label{display:block;margin:12px 0 3px;font-weight:bold}
+input,textarea{width:100%;background:var(--input);color:var(--text);border:1px solid var(--line);padding:6px 8px;font:inherit;border-radius:2px}
+textarea{min-height:200px;resize:vertical}
+input:focus,textarea:focus,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.err{color:var(--bad);font-size:12px;min-height:16px}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;align-items:center}
+.btn{background:var(--nav);color:var(--link);border:1px solid var(--line);padding:6px 14px;font:inherit;cursor:pointer;border-radius:2px}
+.btn:hover{background:#000;color:var(--hover)}
+.btn.sel-a{background:var(--ok);border-color:var(--ok);color:#000}
+.btn.sel-d{background:var(--bad);border-color:var(--bad);color:#000}
+.sp{margin-left:auto}
+details{background:var(--nav);padding:8px 10px;margin-bottom:12px;border-radius:2px}
+details summary{cursor:pointer;font-weight:bold;color:var(--accent)}
+details summary:hover{color:var(--hover)}
+details ol{margin:6px 0 6px 18px;padding:0}
+.rev{border-top:1px solid var(--line);padding:8px 0}
+.rev pre{white-space:pre-wrap;margin:4px 0 0;font:inherit;color:var(--text)}
+.rev.bad{border-left:3px solid var(--bad);padding-left:10px;background:#2a1212}
+.small{color:var(--muted);font-size:12px}
+@media(max-width:800px){.wrap{flex-direction:column}aside{width:100%}aside ol{display:flex;flex-wrap:wrap;gap:2px}aside li{width:auto}aside li button .tag{margin-left:4px}}
+</style>
+</head>
+<body>
+<header>
+  <img id="logo" alt="e6AI" height="32">
+  <span class="stage">Janitor application stage 2</span>
+</header>
+<div class="wrap">
+  <aside><h3>Pending queue</h3><ol id="queue"></ol><p class="small" id="saved"></p></aside>
+  <main id="main"></main>
+</div>
+
+<script>
+// ---- Config -------------------------------------------------------------
+// Where finished applications go. Either:
+//  - a Discord webhook URL (https://discord.com/api/webhooks/...): each application arrives in that
+//    channel as an attached application.json, ready to load into the reviewer, or
+//  - any URL that accepts a JSON POST.
+// Left empty, applicants get a Download button and send you the file themselves.
+// Anyone can read this URL from the page source, so use a private channel and rotate it if abused.
+const SUBMIT_URL = "";
+// Optional answer key for the reviewer (open this file with #review on the end), one entry per post,
+// e.g. ["delete","approve",...]. Leave empty to skip automatic checking.
+const ANSWER_KEY = [];
+const GUIDE = "https://e6ai.net/help/uploading_guidelines";
+const POSTS = [
+  {u:"https://cdn.imgchest.com/files/60af799a862e.jpg"},
+  {u:"https://cdn.imgchest.com/files/e5f8607b4143.mp4",v:1},
+  {u:"https://cdn.imgchest.com/files/45d76b998f18.png"},
+  {u:"https://cdn.imgchest.com/files/b8d4ba19c76f.jpg"},
+  {u:"https://cdn.imgchest.com/files/7cf7d7becfd1.png"},
+  {u:"https://cdn.imgchest.com/files/6dae6887df4b.png"},
+  {u:"https://cdn.imgchest.com/files/539500285bb0.mp4",v:1},
+  {u:"https://cdn.imgchest.com/files/361453edfec7.png"},
+  {u:"https://cdn.imgchest.com/files/6a668bd44047.png"},
+  {u:"https://cdn.imgchest.com/files/6618b6b048f9.jpg"}
+];
+// Media loads from posts/post-N.<ext> next to this page first (e.g. posts/post-1.jpg, posts/post-2.mp4),
+// then falls back to the original link.
+const extOf=u=>u.split("?")[0].split(".").pop().toLowerCase();
+const mAttr=(n,u)=>`data-a="posts/post-${n}.${extOf(u)}" data-b="${u.replace(/"/g,"&quot;")}" data-v="${/^(mp4|webm)$/.test(extOf(u))?1:0}"`;
+function mount(el){
+  const urls=[el.dataset.a,el.dataset.b],vid=el.dataset.v==="1";let k=0;
+  const n=document.createElement(vid?"video":"img");
+  if(vid){n.controls=true;n.preload="metadata";}else n.alt="";
+  n.referrerPolicy="no-referrer";
+  n.addEventListener("error",()=>{
+    if(++k<urls.length){n.src=urls[k];return;}
+    el.innerHTML=`<div class="fail">This ${vid?"clip":"image"} could not be loaded. Place the file at <code>${esc(urls[0])}</code> next to this page, or <a href="${esc(urls[1])}" target="_blank" rel="noopener">open the original link</a>.</div>`;});
+  n.src=urls[0];el.appendChild(n);
+}
+(function(){const el=document.getElementById("logo"),u=["logo.svg","https://e6ai.net/vite/assets/default-CKI9Mcpt.svg"];let k=0;
+  el.referrerPolicy="no-referrer";
+  el.addEventListener("error",()=>{if(++k<u.length)el.src=u[k];else{const t=document.createElement("span");t.className="logo";t.textContent="e6AI";el.replaceWith(t);}});
+  el.src=u[0];})();
+const KEY = "e6ai-janitor-stage2";
+let S = {step:0, email:"", username:"", discord:"", posts:POSTS.map(()=>({d:"",t:""})), done:false};
+try{const r=localStorage.getItem(KEY); if(r) S=Object.assign(S,JSON.parse(r));}catch(e){}
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S));$("#saved").textContent="Progress saved in this browser.";}catch(e){$("#saved").textContent="";}}
+function go(n){S.step=n;if(n===POSTS.length+1)S.tried=true;save();render();window.scrollTo(0,0);}
+
+function queue(){
+  const items=[`<li><button class="${S.step===0?'cur':''}" onclick="go(0)">Your details${S.tried&&introErr()?'<span class="tag d">!</span>':''}</button></li>`];
+  POSTS.forEach((p,i)=>{const d=S.posts[i].d,bad=S.tried&&postErr(i);
+    items.push(`<li><button class="${S.step===i+1?'cur':''}" onclick="go(${i+1})">Post ${i+1}<span class="tag ${bad?'d':d==='approve'?'a':'d'}">${bad?'! '+(d||'missing'):d}</span></button></li>`);});
+  items.push(`<li><button class="${S.step===POSTS.length+1?'cur':''}" onclick="go(${POSTS.length+1})">Review &amp; submit</button></li>`);
+  $("#queue").innerHTML=items.join("");
+}
+
+function intro(){
+  return `<h2>e6ai Janitor Application - Stage 2</h2>
+  <p>Thank you for your continued interest in a janitor position on e6ai!</p>
+  <p>This time around you will be looking through examples of posts you might stumble upon in the pending queue. As a reminder, your main role as janitor is to handle post curation on the site, by following the <a href="${GUIDE}" target="_blank" rel="noopener">uploading guidelines</a> and your own discretion.</p>
+  <p>Keep in mind that this is a fairly <b>lengthy questionnaire</b>, it will take a while to get through. Please take your time and feel free to take breaks in-between. Your progress is saved in this browser as you go.</p>
+  <label for="email">Email *</label><input id="email" type="email" value="${esc(S.email)}" autocomplete="email">
+  <label for="username">What is your e6ai username? *</label><input id="username" value="${esc(S.username)}">
+  <label for="discord">What is your Discord username (not display name)? *</label><input id="discord" value="${esc(S.discord)}">
+  <div class="err" id="err"></div>
+  <div class="row"><button class="btn sp" onclick="saveIntro()">Begin pending queue</button></div>`;
+}
+function readIntro(){S.email=$("#email").value.trim();S.username=$("#username").value.trim();S.discord=$("#discord").value.trim();}
+function introErr(){
+  if(!/^\S+@\S+\.\S+$/.test(S.email))return "Enter a valid email address.";
+  if(!S.username)return "Enter your e6ai username.";
+  if(!S.discord)return "Enter your Discord username.";
+  return "";
+}
+function saveIntro(){readIntro();const e=introErr();if(e){$("#err").textContent=e;return;}go(1);}
+
+function postView(i){
+  const p=POSTS[i],a=S.posts[i];
+  return `<h2>Post ${i+1} of ${POSTS.length}</h2>
+  ${p.v?'<div class="notice audio">This is a clip and has audio. Check your volume before playing.</div>':''}
+  <div class="media" id="media" ${mAttr(i+1,p.u)}></div>
+  <details ${i===0?'open':''}><summary>Instructions</summary>
+    <p>Decide whether this post should be approved or deleted, then briefly explain why. Begin your answer with &ldquo;approve&rdquo; or &ldquo;delete&rdquo;, then comment on whichever of these apply (skipping any with nothing meaningful to note):</p>
+    <ol><li>Are there any large quality issues with this image?</li><li>Are there smaller quality issues that are borderline enough that they could go either way?</li><li>Is there anything else to remark on with this image?</li></ol>
+    <p>Janitors do not zoom in. Review images at full resolution only and avoid zooming beyond 100%. Keep the <a href="${GUIDE}" target="_blank" rel="noopener">uploading guidelines</a> handy.</p></details>
+  <div class="row" id="decbtns" style="margin-top:0">
+    <button class="btn ${a.d==='approve'?'sel-a':''}" data-d="approve" onclick="pick(${i},'approve')">Approve</button>
+    <button class="btn ${a.d==='delete'?'sel-d':''}" data-d="delete" onclick="pick(${i},'delete')">Delete</button></div>
+  <label for="why">Your reasoning *</label>
+  <textarea id="why" oninput="S.posts[${i}].t=this.value;save();if(S.tried)queue()">${esc(a.t)}</textarea>
+  <div class="err" id="err"></div>
+  <div class="row"><button class="btn" onclick="nav(${i},-1)">Previous</button>
+    <button class="btn sp" onclick="nav(${i},1)">${i===POSTS.length-1?'Review answers':'Next post'}</button></div>`;
+}
+function pick(i,d){S.posts[i].d=d;save();queue();
+  document.querySelectorAll("#decbtns .btn").forEach(b=>{b.className="btn"+(b.dataset.d===d?(d==="approve"?" sel-a":" sel-d"):"");});}
+function postErr(i){const a=S.posts[i];
+  if(!a.d)return "Choose Approve or Delete.";
+  if(!a.t.trim())return "Explain your reasoning before continuing.";return "";}
+function nav(i,dir){
+  if(dir>0){const e=postErr(i);if(e){$("#err").textContent=e;return;}}
+  go(dir>0?i+2:i);
+}
+
+function answerText(a){return a.d+"\n\n"+a.t.trim();}
+function missing(){return [...(introErr()?["d"]:[]),...POSTS.map((_,i)=>postErr(i)?i+1:0).filter(Boolean)];}
+function unf(m){return "Unfinished: "+m.map(x=>x==="d"?`<a href="#" onclick="go(0);return false">your details</a>`:`<a href="#" onclick="go(${x});return false">post ${x}</a>`).join(", ")+".";}
+function review(){
+  const miss=missing(),ie=introErr();
+  return `<h2>Review &amp; submit</h2>
+  <div class="rev ${ie?'bad':''}"><b>Your details</b> <a href="#" onclick="go(0);return false">edit</a>${ie?` <span class="d">${esc(ie)}</span>`:''}
+    <pre>${esc(S.username)} &middot; ${esc(S.email)} &middot; ${esc(S.discord)}</pre></div>
+  ${S.posts.map((a,i)=>{const bad=!a.d?"No decision chosen":!a.t.trim()?"Reasoning missing":"";
+    return `<div class="rev ${bad?'bad':''}"><b>Post ${i+1}</b> <a href="#" onclick="go(${i+1});return false">edit</a>${bad?` <span class="d">${bad}</span>`:''}
+    <pre>${a.d?esc(answerText(a)):''}</pre></div>`;}).join("")}
+  <div class="err" id="err">${miss.length?unf(miss):''}</div>
+  <div class="row"><button class="btn" onclick="go(${POSTS.length})">Previous</button>
+    <button class="btn sp" onclick="submitAll()">Submit application</button></div>`;
+}
+function payload(){return {submitted:new Date().toISOString(),email:S.email,e6ai_username:S.username,discord_username:S.discord,
+  answers:S.posts.map((a,i)=>({post:i+1,url:POSTS[i].u,answer:answerText(a)}))};}
+async function submitAll(){
+  const miss=missing();
+  if(miss.length){S.tried=true;save();queue();$("#err").innerHTML=unf(miss);return;}
+  if(SUBMIT_URL){
+    try{let r;
+      if(/discord(app)?\.com\/api\/webhooks\//.test(SUBMIT_URL)){
+        const fd=new FormData();
+        fd.append("payload_json",JSON.stringify({content:"Janitor application: **"+S.username+"** (Discord: "+S.discord+")"}));
+        fd.append("files[0]",new Blob([reportHtml()],{type:"text/html"}),fname());
+        r=await fetch(SUBMIT_URL,{method:"POST",body:fd});
+      }else r=await fetch(SUBMIT_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload())});
+      if(!r.ok)throw 0;}catch(x){$("#err").innerHTML='Submission failed. Try again, or <a href="#" onclick="dl();return false">download your answers</a> and send the file to staff.';return;}
+  }
+  S.done=true;save();render();
+}
+function done(){
+  return `<h2>Thank you for applying!</h2>
+  <p>We will get back to you after deliberation if we have a staff position that would be a good fit for you.</p>
+  <p class="small">${SUBMIT_URL?'Your response has been recorded.':'This copy of the form has no submission endpoint, so your answers only exist here. Download them and send the file to staff.'}</p>
+  ${SUBMIT_URL?'':'<div class="row"><button class="btn" onclick="dl()">Download answers</button></div>'}`;
+}
+const fname=()=>"application-"+(S.username||"applicant").replace(/[^\w-]/g,"_")+".html";
+function dl(){const b=new Blob([reportHtml()],{type:"text/html"});const a=document.createElement("a");
+  a.href=URL.createObjectURL(b);a.download=fname();a.click();URL.revokeObjectURL(a.href);}
+// A self-contained page staff can open in a browser. It also carries the raw data so the reviewer can load it.
+function reportHtml(){
+  const P=payload(),j=JSON.stringify(P).replace(/</g,"\\u003c");
+  const bad=`onerror="this.replaceWith(Object.assign(document.createElement('a'),{href:this.src,textContent:'Media could not be loaded. Open it directly.'}))"`;
+  const sec=P.answers.map((x,i)=>{const d=S.posts[i].d,vid=/^(mp4|webm)$/.test(extOf(x.url));
+    return `<section><h2>Post ${x.post} <span class="b ${d}">${d}</span></h2>
+<div class="m">${vid?`<video controls preload="metadata" src="${esc(x.url)}" ${bad}></video>`:`<img src="${esc(x.url)}" alt="" ${bad}>`}</div>
+<p class="s"><a href="${esc(x.url)}" target="_blank" rel="noopener">Original link</a></p>
+<pre>${esc(S.posts[i].t.trim())}</pre></section>`;}).join("");
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="referrer" content="no-referrer">
+<title>Janitor application: ${esc(P.e6ai_username)}</title><style>
+:root{color-scheme:dark}body{margin:0 auto;max-width:960px;padding:18px;background:#000;color:#fff;font:14px/1.5 Verdana,Tahoma,sans-serif}
+a{color:#ffee95;text-decoration:none}a:hover{color:#f68b00}h1{color:#e8c446;font-size:20px;margin:0 0 4px}
+.i{color:#cbb295;font-size:12px;margin-bottom:16px}section{background:#222;border-radius:3px;padding:10px 14px;margin-bottom:14px}
+h2{font-size:15px;color:#e8c446;margin:0 0 8px}.b{font-size:12px;padding:1px 8px;border-radius:2px;color:#000;margin-left:6px}
+.approve{background:#4ccf5f}.delete{background:#ff5a5a}.m{background:#000;text-align:center;padding:8px;overflow:auto}
+.m img,.m video{max-width:100%;height:auto;vertical-align:top}.s{font-size:12px;margin:4px 0}pre{white-space:pre-wrap;font:inherit;margin:8px 0 0}
+</style></head><body><h1>Janitor application stage 2: ${esc(P.e6ai_username)}</h1>
+<div class="i">Discord: ${esc(P.discord_username)} &middot; Email: ${esc(P.email)} &middot; Submitted ${esc(P.submitted)}</div>
+${sec}<script type="application/json" id="app-data">${j}<\/script></body></html>`;
+}
+
+// ---- Reviewer (open this file with #review on the end) -----------------
+let R={apps:[],cur:0},G={};
+try{G=JSON.parse(localStorage.getItem(KEY+"-grades")||"{}");}catch(e){}
+const gk=a=>a.email+"|"+a.discord_username;
+const gsave=()=>{try{localStorage.setItem(KEY+"-grades",JSON.stringify(G));}catch(e){}};
+const dec=x=>(x.answer.trim().split(/\s+/)[0]||"").toLowerCase().replace(/[^a-z]/g,"");
+const gr=(a,i)=>((G[gk(a)]||{}).p||[])[i]||{};
+function setG(i,f,v){const a=R.apps[R.cur],g=G[gk(a)]=G[gk(a)]||{p:[],n:""};
+  if(i<0)g.n=v;else{g.p[i]=g.p[i]||{};g.p[i][f]=v;}gsave();if(f==="s")rview();}
+function total(a){return a.answers.reduce((t,_,i)=>t+(+gr(a,i).s||0),0);}
+function reviewer(){
+  document.title="e6ai Janitor Application - Reviewer";
+  document.querySelector(".stage").textContent="Janitor application stage 2: reviewer";
+  document.querySelector(".wrap").innerHTML=`<aside><h3>Applicants</h3><input type="file" id="files" accept=".html,.json" multiple>
+    <ol id="alist" style="margin-top:8px"></ol><div class="row"><button class="btn" onclick="csv()">Export CSV</button></div></aside>
+    <main id="rmain"><h2>Reviewer</h2><p>Load the application files applicants submitted (.html or .json). Scores and notes are saved in this browser.</p></main>`;
+  $("#files").onchange=async e=>{for(const f of e.target.files){try{const t=await f.text(),m=t.match(/id="app-data">([\s\S]*?)<\/script>/),j=JSON.parse(m?m[1]:t);
+    (Array.isArray(j)?j:[j]).forEach(x=>{if(x&&Array.isArray(x.answers)&&!R.apps.some(y=>gk(y)===gk(x)))R.apps.push(x);});}catch(x){}}rview();};
+}
+function rview(){
+  $("#alist").innerHTML=R.apps.map((a,i)=>`<li><button class="${i===R.cur?'cur':''}" onclick="R.cur=${i};rview()">${esc(a.e6ai_username)}<span class="tag">${total(a)}/${a.answers.length*2}</span></button></li>`).join("");
+  const a=R.apps[R.cur];if(!a)return;
+  $("#rmain").innerHTML=`<h2>${esc(a.e6ai_username)}</h2>
+   <p class="small">${esc(a.email)} &middot; Discord: ${esc(a.discord_username)} &middot; Score ${total(a)}/${a.answers.length*2} (0 poor, 1 okay, 2 good)</p>`+
+   a.answers.map((x,i)=>{const g=gr(a,i),k=ANSWER_KEY[i],d=dec(x);
+    return `<div class="rev"><b>Post ${x.post}</b>${k?` <span class="${d===k?'a':'d'}">${d===k?'matches key':'key says '+esc(k)}</span>`:''}
+     <div class="media" style="margin-top:6px" ${mAttr(x.post,x.url)}></div>
+     <pre>${esc(x.answer)}</pre>
+     <div class="row"><select onchange="setG(${i},'s',this.value)" class="btn"><option value="">Score</option>${[0,1,2].map(n=>`<option ${g.s==n&&g.s!==undefined&&g.s!==""?'selected':''}>${n}</option>`).join("")}</select>
+     <input style="flex:1" placeholder="Notes" value="${esc(g.c||"")}" onchange="setG(${i},'c',this.value)"></div></div>`;}).join("")+
+   `<label>Overall notes</label><textarea style="min-height:90px" onchange="setG(-1,'n',this.value)">${esc((G[gk(a)]||{}).n||"")}</textarea>`;
+  document.querySelectorAll("#rmain .media").forEach(mount);
+}
+function csv(){
+  const q=v=>'"'+String(v??"").replace(/"/g,'""')+'"',n=POSTS.length,h=["e6ai_username","email","discord"];
+  for(let i=1;i<=n;i++)h.push("p"+i+"_decision","p"+i+"_score","p"+i+"_notes");h.push("total","overall_notes");
+  const rows=R.apps.map(a=>[a.e6ai_username,a.email,a.discord_username,...a.answers.flatMap((x,i)=>[dec(x),gr(a,i).s??"",gr(a,i).c??""]),total(a),(G[gk(a)]||{}).n||""]);
+  const b=new Blob([[h,...rows].map(r=>r.map(q).join(",")).join("\n")],{type:"text/csv"});
+  const l=document.createElement("a");l.href=URL.createObjectURL(b);l.download="janitor-results.csv";l.click();URL.revokeObjectURL(l.href);
+}
+window.addEventListener("hashchange",()=>location.reload());
+
+function render(){
+  if(location.hash==="#review")return reviewer();
+  queue();
+  const m=$("#main");
+  if(S.done)m.innerHTML=done();
+  else if(S.step===0)m.innerHTML=intro();
+  else if(S.step<=POSTS.length)m.innerHTML=postView(S.step-1);
+  else m.innerHTML=review();
+  m.querySelectorAll(".media").forEach(mount);
+  const intro_=$("#email");if(intro_)["email","username","discord"].forEach(id=>$("#"+id).addEventListener("input",()=>{readIntro();save();}));
+}
+render();
+</script>
+</body>
+</html>
