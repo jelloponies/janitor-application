@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>e6ai Janitor Application - Stage 1</title>
+<style>
+:root{--bg:#000;--panel:#222;--nav:#333;--line:#4d4d4d;--link:#ffee95;--hover:#f68b00;--accent:#e8c446;--text:#fff;--muted:#cbb295;--ok:#4ccf5f;--bad:#ff5a5a;--input:#333;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 Verdana,Tahoma,sans-serif}
+a{color:var(--link);text-decoration:none}a:hover{color:var(--hover)}
+header{background:var(--panel);border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;align-items:center;gap:4px 18px;padding:6px 14px}
+header img{display:block;height:32px;width:auto}
+header .logo{font-size:22px;font-weight:bold;color:var(--accent)}
+header .stage{color:var(--accent);font-size:18px;font-weight:bold}
+.wrap{display:flex;gap:14px;max-width:1280px;margin:14px auto;padding:0 12px;align-items:flex-start}
+aside{width:230px;flex:none;background:var(--panel);padding:10px;border-radius:3px}
+aside h3,main h2{margin:0 0 8px;font-size:15px;color:var(--accent)}
+aside ol{list-style:none;margin:0;padding:0}
+aside li button{all:unset;display:flex;width:100%;gap:6px;padding:3px 4px;cursor:pointer;color:var(--link);border-radius:2px;box-sizing:border-box}
+aside li button:hover{background:var(--nav);color:var(--hover)}
+aside li button.cur{background:var(--nav);color:var(--text);font-weight:bold}
+aside .tag{margin-left:auto;font-size:11px}
+.a{color:var(--ok)}.d{color:var(--bad)}
+main{flex:1;min-width:0;background:var(--panel);padding:14px 16px;border-radius:3px}
+label{display:block;margin:14px 0 3px;font-weight:bold}
+label.opt{display:flex;gap:8px;align-items:center;font-weight:normal;margin:6px 0;cursor:pointer}
+label.opt input{width:auto}
+input,textarea{width:100%;background:var(--input);color:var(--text);border:1px solid var(--line);padding:6px 8px;font:inherit;border-radius:2px}
+textarea{min-height:130px;resize:vertical}
+input:focus,textarea:focus,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.err{color:var(--bad);font-size:12px;min-height:16px;margin-top:8px}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;align-items:center}
+.btn{background:var(--nav);color:var(--link);border:1px solid var(--line);padding:6px 14px;font:inherit;cursor:pointer;border-radius:2px}
+.btn:hover{background:#000;color:var(--hover)}
+.btn:disabled{opacity:.6;cursor:default}
+.sp{margin-left:auto}
+.rev{border-top:1px solid var(--line);padding:8px 0}
+.rev pre{white-space:pre-wrap;margin:4px 0 0;font:inherit;color:var(--text)}
+.rev .q{white-space:pre-wrap}
+.rev.bad{border-left:3px solid var(--bad);padding-left:10px;background:#2a1212}
+.small{color:var(--muted);font-size:12px}
+@media(max-width:800px){.wrap{flex-direction:column}aside{width:100%}aside ol{display:flex;flex-wrap:wrap;gap:2px}aside li{width:auto}aside li button .tag{margin-left:4px}}
+</style>
+</head>
+<body>
+<header>
+  <img id="logo" alt="e6AI" height="32">
+  <span class="stage">Janitor application stage 1</span>
+</header>
+<div class="wrap">
+  <aside><h3>Sections</h3><ol id="queue"></ol><p class="small" id="saved"></p></aside>
+  <main id="main"></main>
+</div>
+
+<script>
+// ---- Config -------------------------------------------------------------
+// Address of your Cloudflare Worker, without a trailing slash.
+const WORKER = "https://janitor-intake.jelloponies.workers.dev";
+
+// ---- The form text: edit the wording here -------------------------------
+// Each section has a title, optional intro paragraphs and a list of fields.
+// Text supports [link text](https://address) for links, **bold**, and \n for line breaks.
+// Field options:  t = "text" | "email" | "long" | "radio" (default "long")
+//                 o:1 makes a field optional (everything else is required)
+//                 d = small help text under the question
+//                 p = the field is one of the fixed details the Worker stores separately
+//                     (email, user_id, discord_username, timezone, over18, referral). Don't change these names.
+// Questions without p are stored together with the question text as it was when the person applied,
+// so you can reword, add or remove questions at any time without breaking older applications.
+const SECTIONS = [
+{
+  title: "About you",
+  intro: [
+    `Thank you for your interest in a janitor position on e6ai!`,
+    `As janitor your main role is to handle post curation on the site, by following the [uploading guidelines](https://e6ai.net/help/uploading_guidelines) and your own discretion. Please note that this is a volunteer position.`,
+    `We want to first of all point out that most post curation is done using a computer (PC, laptop, Mac etc.), because our staff tools aren't optimized for use on mobile devices (phones, tablets), and you’ll be at risk of misclicks and general bugs that yield unexpected results. You're expected to keep up with the latest news updates in the staff channel on Discord. If you can't or are unwilling to do that, please reconsider joining the staff team.`,
+    `This first stage of the questionnaire is to give us an idea of who you are and whether or not you'd be a good fit for the team. This stage will therefore not actually focus on examples of post curation.`,
+    `Please note that all of these questions are hypothetical scenarios, and we use them more to gauge your thought process, rather than exact knowledge of our policies and rules. Simply answer with what feels like the correct answer. However, actual correctness of answers is of course very much appreciated.`,
+    `You may wish to review the [rules page](https://e6ai.net/wiki_pages/3) before answering any of the following questions.`,
+    `Where possible, please also give reasoning for your answer.`,
+    `Keep in mind that this is a **lengthy questionnaire**, it will take a while to get through. Please take your time and feel free to take breaks in-between. Your progress is saved in this browser as you go.`
+  ],
+  fields: [
+    {p:"email", t:"email", q:`Email`},
+    {p:"user_id", t:"text", q:`What is your e6ai user ID number?`},
+    {p:"discord_username", t:"text", q:`What is your Discord username (not display name)`, d:`For communication and cohesion, use of a Discord account is required. This can be an alt account, so long as we are able to contact you on it.`},
+    {p:"timezone", t:"text", q:`What is your timezone?`, d:`For example: UTC+1`},
+    {p:"over18", t:"radio", q:`Are you at least 18 years old?`, opts:[["yes","Yes, I am at least 18 years old"],["no","No, I am not 18 yet"]]},
+    {q:`Why do you wish to become a staff member?`},
+    {q:`Do you have any previous experience or unique skills you bring to the table?\n\nPlease, describe it briefly if so.`, d:`For example: Moderation on other boorus/servers, non-English languages, technical skills, etc.`},
+    {q:`What are your expectations for being e6ai staff?`},
+    {q:`Anything else you would like to mention?`},
+    {p:"referral", t:"text", o:1, q:`Did any staff member refer you?`, d:`(optional)`}
+  ]
+},
+{
+  title: "Common janitor scenarios",
+  intro: [
+    `These questions aren't necessarily to quiz you on whether or not you do the 'correct thing', but more to get an idea of your thought process, so please walk us through what you do and why you do it.\n\nWhat would you do if...`
+  ],
+  fields: [
+    {q:`A user with name “VagueDrake” adds you to friends on Discord and asks if you could remove their artwork from the site.`},
+    {q:`A user DMs you and asks if you can replace a post for them.`},
+    {q:`Someone uploads an image of a character saluting in front of a swastika.`},
+    {q:`Someone uploads a series of images one after the other that all appear to be slight variations of one another as if they used the same prompts and clicked generate several times.`},
+    {q:`You deleted a post and the user who uploaded it contacts you to dispute the deletion.`},
+    {q:`You spot a comment that says “oh, the ‘anonymous director’ is actually <director name>”.`},
+    {q:`You notice that a user appears to upload very similar images over the course of several days or weeks.`},
+    {q:`You spot an image where VagueDrake keeps adding the “cute” tag, but another user named GremlinLifestyleTips keeps removing that tag, and they seem to have been going at it for a while. What do you do?`},
+    {q:`Someone has flagged a post with the flag "Does not meet the [uploading guidelines](https://e6ai.net/wiki_pages/show_or_new?title=uploading_guidelines)".\n\nThe image in the post depicts a feral fox that is clearly young.`},
+    {q:`Someone creates a thread on the forum called "e6ai is committing art theft and mass scraping for their content". What is your reaction?`},
+    {q:`Someone creates a thread in the forum called "The problem with e6 moderation", where they are expressing concern over an announcement saying all posts featuring a certain type of content is going to be removed from the site`},
+    {q:`Someone comments “@your_name_here, you’re a terrible janitor, why did they even hire you?”, where “your_name_here” is your on-site username.`},
+    {q:`Someone uploads an animation that is generated off another directors upload. The original director is now flagging the post with the flag "Trace of another artist's work".`},
+    {q:`Someone has flagged a post with the flag "Does not meet the [uploading guidelines](https://e6ai.net/wiki_pages/show_or_new?title=uploading_guidelines)". In the comments under the post you can see that someone claims it is an img2img of a traditionally made artwork.`}
+  ]
+},
+{
+  title: "Potential staff life scenarios",
+  intro: [
+    `Answer both the question and the sub-question, please.`
+  ],
+  fields: [
+    {q:`You’ve been a janitor for two weeks now, and you notice that most tasks are very repetitive, boring things.\n\nHow do you plan to deal with that to remain active?`},
+    {q:`Despite your best efforts, everything still feels like a repetitive loop and you are very tired of that.\n\nWhat would you do in this scenario?`},
+    {q:`You just can’t get along with another staff member who keeps irritating you. How do you plan to deal with that?`},
+    {q:`And what if nothing you did helps, and that staff member is still managing to get on your nerves? You feel very frustrated about them.`},
+    {q:`An admin is proposing a decision that you can see/feel would cause harm to the site, but a few other mods agree with them. When you voice concern, the admin seems to respond with something like “what do you even know, you have only been staff for a month”. How would you deal with such a situation?`},
+    {q:`Despite your best efforts, the bad decision was still implemented for real.\n\nYour worst fears have been realized: there is a crisis, and everything is on fire. Where do you fit in here?`},
+    {q:`Dozens of people on social media (such as Twitter, Facebook, Discord, etc) are saying that e6ai supports bad things, and you as a staff member are enabling it. What would your course of action be?`}
+  ]
+}
+];
+const DONE_TITLE = "Thank you for applying!";
+const DONE_TEXT = "We will get back to you if you've moved on to the next round!";
+
+// ---- Code (no need to edit below) ---------------------------------------
+const KEY = "e6ai-janitor-stage1";
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt = s => esc(s).replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g,'<a href="$2" target="_blank" rel="noopener">$1</a>').replace(/\*\*([^*]+)\*\*/g,"<b>$1</b>").replace(/\n/g,"<br>");
+const plain = s => s.replace(/\[([^\]]+)\]\([^)]*\)/g,"$1").replace(/\*\*/g,"");
+
+(function(){const el=$("#logo"),u=["../stage-2/logo.svg","https://e6ai.net/vite/assets/default-CKI9Mcpt.svg"];let k=0;
+  el.referrerPolicy="no-referrer";
+  el.addEventListener("error",()=>{if(++k<u.length)el.src=u[k];else{const t=document.createElement("span");t.className="logo";t.textContent="e6AI";el.replaceWith(t);}});
+  el.src=u[0];})();
+
+const FIELDS = [];
+SECTIONS.forEach((s,si)=>s.fields.forEach(f=>{f.si=si;f.n=FIELDS.length;f.k=f.p||plain(f.q);f.t=f.t||"long";FIELDS.push(f);}));
+
+let S = {step:0, v:{}, tried:false, done:false};
+try{const r=localStorage.getItem(KEY); if(r) S=Object.assign(S,JSON.parse(r));}catch(e){}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S));$("#saved").textContent="Progress saved in this browser.";}catch(e){$("#saved").textContent="";}}
+function go(n){S.step=n;if(n===SECTIONS.length)S.tried=true;save();render();window.scrollTo(0,0);}
+function setv(n,val){S.v[FIELDS[n].k]=val;save();if(S.tried)queue();}
+
+function ferr(f){
+  const v=(S.v[f.k]||"").trim();
+  if(!v)return f.o?"":(f.t==="radio"?"Choose an option.":"Required.");
+  if(f.t==="email"&&!/^\S+@\S+\.\S+$/.test(v))return "Enter a valid email address.";
+  if(f.p==="user_id"&&!/^#?\d{1,12}$/.test(v))return "Enter the number only, for example 12345.";
+  return "";
+}
+const secFields = si => FIELDS.filter(f=>f.si===si&&ferr(f));
+
+function queue(){
+  const items=SECTIONS.map((s,i)=>{
+    const bad=secFields(i).length, mark=bad?(S.tried?'<span class="tag d">!</span>':''):'<span class="tag a">&#10003;</span>';
+    return `<li><button class="${S.step===i?'cur':''}" onclick="go(${i})">${esc(s.title)}${mark}</button></li>`;});
+  items.push(`<li><button class="${S.step===SECTIONS.length?'cur':''}" onclick="go(${SECTIONS.length})">Review &amp; submit</button></li>`);
+  $("#queue").innerHTML=items.join("");
+}
+
+function fieldHtml(f){
+  const v=S.v[f.k]||"", req=f.o?"":" *";
+  let input;
+  if(f.t==="radio"){
+    input=f.opts.map(([val,lab])=>`<label class="opt"><input type="radio" name="f${f.n}" value="${esc(val)}" ${v===val?"checked":""} onchange="setv(${f.n},this.value)"> ${esc(lab)}</label>`).join("");
+    return `<label>${fmt(f.q)}${req}</label>${f.d?`<div class="small">${fmt(f.d)}</div>`:""}${input}`;
+  }
+  if(f.t==="long")input=`<textarea id="f${f.n}" maxlength="6000" oninput="setv(${f.n},this.value)">${esc(v)}</textarea>`;
+  else input=`<input id="f${f.n}" type="${f.t==="email"?"email":"text"}" maxlength="200" value="${esc(v)}" oninput="setv(${f.n},this.value)">`;
+  return `<label for="f${f.n}">${fmt(f.q)}${req}</label>${f.d?`<div class="small">${fmt(f.d)}</div>`:""}${input}`;
+}
+
+function secView(n){
+  const s=SECTIONS[n];
+  return `<h2>${n===0?"e6ai Janitor Application - Stage 1":esc(s.title)}</h2>${n===0?`<h2 style="font-size:13px;color:var(--muted)">${esc(s.title)}</h2>`:""}
+  ${(s.intro||[]).map(p=>`<p>${fmt(p)}</p>`).join("")}
+  ${s.fields.map(fieldHtml).join("")}
+  <div class="err" id="err"></div>
+  <div class="row">${n?`<button class="btn" onclick="go(${n-1})">Previous</button>`:""}
+    <button class="btn sp" onclick="next(${n})">${n===SECTIONS.length-1?"Review answers":"Next section"}</button></div>`;
+}
+function next(n){
+  const bad=secFields(n);
+  if(bad.length){S.tried=true;save();queue();
+    $("#err").textContent=bad.length+" required question"+(bad.length>1?"s":"")+" still need"+(bad.length>1?"":"s")+" an answer. First one: “"+plain(bad[0].q).split("\n")[0].slice(0,90)+"” ("+ferr(bad[0])+")";
+    return;}
+  go(n+1);
+}
+
+function review(){
+  const unfinished=SECTIONS.map((_,i)=>i).filter(i=>secFields(i).length);
+  return `<h2>Review &amp; submit</h2>
+  ${SECTIONS.map((s,i)=>{const bad=secFields(i).length;
+    return `<div class="rev ${bad?'bad':''}"><b>${esc(s.title)}</b> <a href="#" onclick="go(${i});return false">edit</a>${bad?` <span class="d">${bad} unanswered</span>`:''}
+    ${s.fields.map(f=>{const v=(S.v[f.k]||"").trim(),lab=f.t==="radio"&&v?(f.opts.find(o=>o[0]===v)||[0,v])[1]:v;
+      return `<div style="margin-top:8px"><span class="small q">${esc(plain(f.q))}</span><pre>${lab?esc(lab):'<span class="d">'+(f.o?'(left blank)':'missing')+'</span>'}</pre></div>`;}).join("")}</div>`;}).join("")}
+  <div class="err" id="err">${unfinished.length?"Unfinished: "+unfinished.map(i=>`<a href="#" onclick="go(${i});return false">${esc(SECTIONS[i].title)}</a>`).join(", ")+".":""}</div>
+  <div class="row"><button class="btn" onclick="go(${SECTIONS.length-1})">Previous</button>
+    <button class="btn sp" id="sub" onclick="submitAll()">Submit application</button></div>`;
+}
+
+function payload(){
+  const p={stage:1,answers:[]};
+  FIELDS.forEach(f=>{const v=(S.v[f.k]||"").trim();
+    if(f.p)p[f.p]=f.p==="user_id"?v.replace(/^#/,""):v;
+    else p.answers.push({q:plain(f.q),answer:v});});
+  return p;
+}
+async function submitAll(){
+  const bad=SECTIONS.map((_,i)=>i).filter(i=>secFields(i).length);
+  if(bad.length){S.tried=true;save();queue();$("#err").innerHTML="Unfinished: "+bad.map(i=>`<a href="#" onclick="go(${i});return false">${esc(SECTIONS[i].title)}</a>`).join(", ")+".";return;}
+  const b=$("#sub");b.disabled=true;b.textContent="Submitting…";
+  try{
+    const r=await fetch(WORKER,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload())});
+    if(!r.ok)throw 0;
+  }catch(x){
+    b.disabled=false;b.textContent="Submit application";
+    $("#err").innerHTML='Submission failed. Wait a moment and try again, or <a href="#" onclick="dl();return false">download your answers</a> and send the file to staff.';
+    return;
+  }
+  S.done=true;save();render();window.scrollTo(0,0);
+}
+function dl(){
+  const b=new Blob([JSON.stringify(payload(),null,2)],{type:"application/json"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="janitor-application-stage1.json";a.click();URL.revokeObjectURL(a.href);
+}
+
+function render(){
+  queue();
+  if(S.done){$("#main").innerHTML=`<h2>${esc(DONE_TITLE)}</h2><p>${fmt(DONE_TEXT)}</p><p class="small">Your response has been recorded.</p>`;return;}
+  $("#main").innerHTML=S.step>=SECTIONS.length?review():secView(S.step);
+}
+render();
+</script>
+</body>
+</html>
