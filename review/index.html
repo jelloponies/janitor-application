@@ -16,6 +16,7 @@ header img{display:block;height:32px;width:auto}header .logo{font-size:22px;font
 header .stage{color:var(--accent);font-size:18px;font-weight:bold}
 header .tabs{margin-left:auto;display:flex;gap:6px}
 .btn.on{background:var(--accent);border-color:var(--accent);color:#000}
+main h2 a{color:var(--accent);border-bottom:1px dotted var(--accent)}main h2 a:hover{color:var(--hover);border-color:var(--hover)}
 .st-advance{color:var(--ok)}.st-reject{color:var(--bad)}.st-hold{color:var(--muted)}
 .wrap{display:flex;gap:14px;max-width:1280px;margin:14px auto;padding:0 12px;align-items:flex-start}
 aside{width:230px;flex:none;background:var(--panel);padding:10px;border-radius:3px}
@@ -54,8 +55,6 @@ input:focus,textarea:focus,button:focus-visible,select:focus-visible{outline:2px
 const WORKER = "https://janitor-intake.jelloponies.workers.dev";
 // Post media is looked up here first (same files as the applicant page), then at the original link.
 const MEDIA = "../stage-2/posts/";
-// Optional answer key, one entry per post, e.g. ["delete","approve",...]. Leave empty to skip checking.
-const ANSWER_KEY = [];
 
 const LS = "e6ai-janitor-review";
 const $ = s => document.querySelector(s);
@@ -126,21 +125,20 @@ async function load(){
 
 // ---- Scoring and display -------------------------------------------------
 const gr=(a,i)=>((G[a._f]||{}).p||[])[i]||{};
-const total=a=>a.answers.reduce((t,_,i)=>t+(+gr(a,i).s||0),0);
-const graded=a=>((G[a._f]||{}).p||[]).some(x=>x&&x.s!==undefined&&x.s!=="");
 const dec=x=>(x.answer.trim().split(/\s+/)[0]||"").toLowerCase().replace(/[^a-z]/g,"");
 const ext=u=>u.split("?")[0].split(".").pop().toLowerCase();
 function setG(i,f,v){
   const a=apps[cur],g=G[a._f]=G[a._f]||{p:[],n:""};
   if(i<0)g.n=v;else{g.p[i]=g.p[i]||{};g.p[i][f]=v;}
   gsave();
-  if(f==="s"){const t=$("#tot");if(t)t.textContent=total(a);renderList();}
 }
 const STATUS=[["","Undecided"],["advance","Advance to stage 2"],["hold","Hold"],["reject","Reject"]];
-const label=a=>stage===1?"#"+a.user_id+" "+a.discord_username:a.e6ai_username;
+const uidOf=a=>String(stage===1?a.user_id:a.e6ai_user_id||"").replace(/\D/g,"");
+const label=a=>uidOf(a)?"#"+uidOf(a)+" "+a.discord_username:(a.e6ai_username||a.discord_username);
+const heading=a=>uidOf(a)?`<a href="https://e6ai.net/users/${uidOf(a)}" target="_blank" rel="noopener" title="Open this user's profile on e6ai">User #${uidOf(a)}</a> &middot; ${esc(a.discord_username)}`:`${esc(a.e6ai_username||"Unknown user")} &middot; ${esc(a.discord_username)}`;
 function tag(a){
   if(stage===1){const d=(G[a._f]||{}).d||"";return d?`<span class="tag st-${esc(d)}">${esc((STATUS.find(x=>x[0]===d)||[0,d])[1].replace(" to stage 2",""))}</span>`:'<span class="tag a">new</span>';}
-  return `<span class="tag ${graded(a)?'':'a'}">${graded(a)?total(a)+'/'+a.answers.length*2:'new'}</span>`;
+  return "";
 }
 function renderList(){
   $("#list").innerHTML=apps.length?apps.map((a,i)=>`<li><button class="${i===cur?'cur':''}" onclick="cur=${i};renderList();show()"><span>${esc(label(a))}</span>${tag(a)}</button></li>`).join(""):'<li class="small">No applications yet.</li>';
@@ -150,14 +148,13 @@ function show(){stage===1?show1():show2();}
 function show2(){
   const a=apps[cur];
   if(!a){$("#main").innerHTML='<h2>No applications yet</h2><p class="small">New submissions appear here after you press Refresh.</p>';return;}
-  $("#main").innerHTML=`<h2>${esc(a.e6ai_username)}</h2>
-    <p class="small">${esc(a.email)} &middot; Discord: ${esc(a.discord_username)} &middot; ${esc(new Date(a.submitted).toLocaleString())} &middot; Score <span id="tot">${total(a)}</span>/${a.answers.length*2} (0 poor, 1 okay, 2 good)</p>`+
-  a.answers.map((x,i)=>{const g=gr(a,i),k=ANSWER_KEY[i],d=dec(x),sv=g.s;
-    return `<div class="rev"><b>Post ${esc(x.post)}</b>${k?` <span class="${d===k?'a':'d'}">${d===k?'matches key':'key says '+esc(k)}</span>`:''}
+  $("#main").innerHTML=`<h2>${heading(a)}</h2>
+    <p class="small">${esc(a.email)} &middot; ${esc(new Date(a.submitted).toLocaleString())}</p>`+
+  a.answers.map((x,i)=>{const g=gr(a,i);
+    return `<div class="rev"><b>Post ${esc(x.post)}</b>
       <div class="media" data-n="${esc(x.post)}" data-e="${esc(ext(x.url))}" data-u="${esc(x.url)}"></div>
       <pre>${esc(x.answer)}</pre>
-      <div class="row"><select class="btn" onchange="setG(${i},'s',this.value)"><option value="" ${sv===undefined||sv===""?"selected":""}>Score</option>${[0,1,2].map(n=>`<option ${String(sv)===String(n)?"selected":""}>${n}</option>`).join("")}</select>
-      <input style="flex:1" placeholder="Notes" value="${esc(g.c||"")}" onchange="setG(${i},'c',this.value)"></div></div>`;}).join("")+
+      <div class="row"><input style="flex:1" placeholder="Notes" value="${esc(g.c||"")}" onchange="setG(${i},'c',this.value)"></div></div>`;}).join("")+
   `<label>Overall notes</label><textarea onchange="setG(-1,'n',this.value)">${esc((G[a._f]||{}).n||"")}</textarea>`;
   document.querySelectorAll("#main .media").forEach(mount);
 }
@@ -165,7 +162,7 @@ function show1(){
   const a=apps[cur];
   if(!a){$("#main").innerHTML='<h2>No applications yet</h2><p class="small">New submissions appear here after you press Refresh.</p>';return;}
   const g=G[a._f]||{},d=g.d||"";
-  $("#main").innerHTML=`<h2>User #${esc(a.user_id)} &middot; ${esc(a.discord_username)}</h2>
+  $("#main").innerHTML=`<h2>${heading(a)}</h2>
     <p class="small">${esc(a.email)} &middot; Timezone: ${esc(a.timezone)} &middot; 18+: <span class="${a.over18==="yes"?"a":"d"}">${esc(a.over18||"unanswered")}</span> &middot; Referred by: ${esc(a.referral||"nobody listed")} &middot; ${esc(new Date(a.submitted).toLocaleString())}</p>
     <div class="row" style="margin-top:0"><b>Decision</b><select class="btn" onchange="setStatus(this.value)">${STATUS.map(([v,t])=>`<option value="${v}" ${d===v?"selected":""}>${t}</option>`).join("")}</select></div>`+
   a.answers.map((x,i)=>`<div class="rev"><b style="white-space:pre-wrap">${esc(x.q)}</b>
@@ -188,9 +185,9 @@ function download(text,name){
   const b=new Blob([text],{type:"text/csv"}),l=document.createElement("a");l.href=URL.createObjectURL(b);l.download=name;l.click();URL.revokeObjectURL(l.href);
 }
 function csv2(){
-  const q=v=>{v=String(v??"");if(/^[=+\-@\t\r]/.test(v))v="'"+v;return '"'+v.replace(/"/g,'""')+'"';},n=Math.max(0,...apps.map(a=>a.answers.length)),h=["submitted","e6ai_username","email","discord"];
-  for(let i=1;i<=n;i++)h.push("p"+i+"_decision","p"+i+"_score","p"+i+"_notes");h.push("total","overall_notes");
-  const rows=apps.map(a=>[a.submitted,a.e6ai_username,a.email,a.discord_username,...a.answers.flatMap((x,i)=>[dec(x),gr(a,i).s??"",gr(a,i).c??""]),total(a),(G[a._f]||{}).n||""]);
+  const q=v=>{v=String(v??"");if(/^[=+\-@\t\r]/.test(v))v="'"+v;return '"'+v.replace(/"/g,'""')+'"';},n=Math.max(0,...apps.map(a=>a.answers.length)),h=["submitted","user_id","email","discord"];
+  for(let i=1;i<=n;i++)h.push("p"+i+"_decision","p"+i+"_notes");h.push("overall_notes");
+  const rows=apps.map(a=>[a.submitted,uidOf(a)||a.e6ai_username||"",a.email,a.discord_username,...a.answers.flatMap((x,i)=>[dec(x),gr(a,i).c??""]),(G[a._f]||{}).n||""]);
   download([h,...rows].map(r=>r.map(q).join(",")).join("\n"),"janitor-results.csv");
 }
 
