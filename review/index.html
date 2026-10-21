@@ -14,7 +14,8 @@ a{color:var(--link);text-decoration:none}a:hover{color:var(--hover)}
 header{background:var(--panel);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:18px;padding:6px 14px}
 header img{display:block;height:32px;width:auto}header .logo{font-size:22px;font-weight:bold;color:var(--accent)}
 header .stage{color:var(--accent);font-size:18px;font-weight:bold}
-header .tabs{margin-left:auto;display:flex;gap:6px}
+.side{width:230px;flex:none}.side aside{width:100%}
+.tabs{display:flex;gap:6px;margin-bottom:8px}.tabs .btn{flex:1}
 .btn.on{background:var(--accent);border-color:var(--accent);color:#000}
 main h2 a{color:var(--accent);border-bottom:1px dotted var(--accent)}main h2 a:hover{color:var(--hover);border-color:var(--hover)}
 .st-advance{color:var(--ok)}.st-reject{color:var(--bad)}.st-hold{color:var(--muted)}
@@ -42,12 +43,11 @@ input:focus,textarea:focus,button:focus-visible,select:focus-visible{outline:2px
 .rev{border-top:1px solid var(--line);padding:8px 0}
 .rev pre{white-space:pre-wrap;margin:4px 0 0;font:inherit;color:var(--text)}
 .small{color:var(--muted);font-size:12px}
-@media(max-width:800px){.wrap{flex-direction:column}aside{width:100%}}
+@media(max-width:800px){.wrap{flex-direction:column}aside,.side{width:100%}}
 </style>
 </head>
 <body>
-<header><img id="logo" alt="e6AI" height="32"><span class="stage">Janitor applications: review</span>
-<span class="tabs"><button class="btn" id="t1" onclick="setStage(1)">Stage 1</button><button class="btn" id="t2" onclick="setStage(2)">Stage 2</button></span></header>
+<header><img id="logo" alt="e6AI" height="32"><span class="stage">Janitor applications: review</span></header>
 <div class="wrap" id="wrap"></div>
 <script>
 // ---- Config -------------------------------------------------------------
@@ -68,9 +68,9 @@ function loadG(){try{G=JSON.parse(localStorage.getItem(GK())||"{}");}catch(e){G=
 const gsave=()=>{try{localStorage.setItem(GK(),JSON.stringify(G));}catch(e){}};
 function setStage(n){
   if(n!==stage){stage=n;try{history.replaceState(null,"",n===1?"#stage1":location.pathname+location.search);}catch(e){}}
-  loadG();apps=[];cur=0;tabs();loadG();tabs();key?load():login();
+  loadG();apps=[];cur=0;tabs();key?load():login();
 }
-function tabs(){$("#t1").classList.toggle("on",stage===1);$("#t2").classList.toggle("on",stage===2);}
+function tabs(){const a=$("#t1"),b=$("#t2");if(a)a.classList.toggle("on",stage===1);if(b)b.classList.toggle("on",stage===2);}
 window.addEventListener("hashchange",()=>{const n=location.hash==="#stage1"?1:2;if(n!==stage)setStage(n);});
 
 (function(){const el=$("#logo"),u=["../stage-2/logo.svg","https://e6ai.net/vite/assets/default-CKI9Mcpt.svg"];let k=0;
@@ -114,9 +114,9 @@ async function load(){
     await Promise.all([1,2,3,4,5,6].map(w));
     if(my!==stage)return;
     apps=list;apps.sort((a,b)=>a._f<b._f?1:-1);cur=0;
-    $("#wrap").innerHTML=`<aside><h3>Stage ${stage} applications</h3><ol id="list"></ol>
-      <div class="row"><button class="btn" onclick="load()">Refresh</button><button class="btn" onclick="csv()">Export CSV</button><button class="btn" onclick="signOut()">Sign out</button></div></aside><main id="main"></main>`;
-    renderList();show();
+    $("#wrap").innerHTML=`<div class="side"><div class="tabs"><button class="btn" id="t1" onclick="setStage(1)">Stage 1</button><button class="btn" id="t2" onclick="setStage(2)">Stage 2</button></div><aside><h3>Stage ${stage} applications</h3><ol id="list"></ol>
+      <div class="row"><button class="btn" onclick="load()">Refresh</button><button class="btn" onclick="csv()">Export CSV</button><button class="btn" onclick="signOut()">Sign out</button></div></aside></div><main id="main"></main>`;
+    tabs();renderList();show();
   }catch(e){
     if(e.auth){try{localStorage.removeItem(LS+"-key");}catch(x){}key="";login("That staff key was not accepted.");}
     else $("#wrap").innerHTML='<main style="max-width:520px;margin:30px auto"><p class="d">Could not load applications. Check the Worker address and your connection.</p><div class="row"><button class="btn" onclick="load()">Try again</button><button class="btn" onclick="signOut()">Sign out</button></div></main>';
@@ -191,7 +191,7 @@ function csv2(){
   download([h,...rows].map(r=>r.map(q).join(",")).join("\n"),"janitor-results.csv");
 }
 
-key?load():login();
+loadG();key?load():login();
 </script>
 </body>
 </html>
